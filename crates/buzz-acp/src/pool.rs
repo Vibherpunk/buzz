@@ -429,6 +429,9 @@ pub enum PromptOutcome {
 /// into every task.
 pub struct PromptContext {
     pub mcp_servers: Vec<McpServer>,
+    /// Channel-scoped tool policy: channels with an entry replace
+    /// `mcp_servers` for sessions created on that channel.
+    pub channel_tools: crate::channel_tools::ChannelTools,
     pub initial_message: Option<String>,
     pub idle_timeout: Duration,
     pub max_turn_duration: Duration,
@@ -754,6 +757,7 @@ async fn create_session_and_apply_model(
     ctx: &PromptContext,
     agent_core: Option<&str>,
     agent_canvas: Option<&str>,
+    channel_id: Option<&Uuid>,
 ) -> Result<String, AcpError> {
     // Build base_prompt + system_prompt + agent core + canvas metadata into a
     // single prompt. Standard protocol-v2 agents receive it in `session/new`;
@@ -773,11 +777,30 @@ async fn create_session_and_apply_model(
         agent_canvas,
     );
 
+    // Channel-scoped tools: a channel with a policy entry replaces the global
+    // MCP set for its session. The agent runtime skips its own configured
+    // extensions whenever explicit servers are passed, so a scoped channel
+    // exposes exactly the listed servers.
+    let mcp_servers = channel_id
+        .and_then(|cid| {
+            let name = ctx.channel_info.get(cid).map(|i| i.name.as_str());
+            ctx.channel_tools.resolve(cid, name).map(|servers| {
+                tracing::info!(
+                    channel = %cid,
+                    channel_name = name.unwrap_or("?"),
+                    servers = servers.len(),
+                    "channel-scoped tools applied to new session"
+                );
+                servers.clone()
+            })
+        })
+        .unwrap_or_else(|| ctx.mcp_servers.clone());
+
     let resp = agent
         .acp
         .session_new_full(
             &ctx.cwd,
-            ctx.mcp_servers.clone(),
+            mcp_servers,
             session_new_system_prompt(
                 is_goose,
                 agent.protocol_version,
@@ -1425,6 +1448,7 @@ pub async fn run_prompt_task(
                     &ctx,
                     agent_core.as_deref(),
                     agent_canvas.as_deref(),
+                    Some(cid),
                 )
                 .await
                 {
@@ -1472,7 +1496,7 @@ pub async fn run_prompt_task(
             if let Some(sid) = &agent.state.heartbeat_session {
                 (sid.clone(), false)
             } else {
-                match create_session_and_apply_model(&mut agent, &ctx, None, None).await {
+                match create_session_and_apply_model(&mut agent, &ctx, None, None, None).await {
                     Ok(sid) => {
                         tracing::info!(
                             target: "pool::session",
@@ -5237,6 +5261,7 @@ mod tests {
         use crate::relay::RestClient;
         PromptContext {
             mcp_servers: vec![],
+            channel_tools: Default::default(),
             initial_message: None,
             idle_timeout: Duration::from_secs(60),
             max_turn_duration: Duration::from_secs(120),
