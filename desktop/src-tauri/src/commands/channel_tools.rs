@@ -130,14 +130,36 @@ pub async fn channel_tools_pool_skills() -> Result<Value, String> {
     json_output(out)
 }
 
-/// Grant an existing pool skill to this channel's room (additive).
+/// Ensure a channel is scoped, returning the room backing it. Called before an
+/// add so an unmapped channel becomes usable in one click — Harbor creates the
+/// room and records the mapping. The room name is an internal detail; the GUI
+/// only ever deals in channels.
+async fn ensure_channel_room(channel: &str) -> Result<String, String> {
+    let out = run_harbor(vec![
+        "channel-tools".into(),
+        channel.to_string(),
+        "--map".into(),
+        "--json".into(),
+    ])
+    .await?;
+    let value = json_output(out)?;
+    value
+        .get("room")
+        .and_then(|r| r.as_str())
+        .map(|s| s.to_string())
+        .ok_or_else(|| "could not scope this channel".to_string())
+}
+
+/// Add an existing skill (from elsewhere in Buzz) to this channel. Scopes the
+/// channel on the fly if it isn't already.
 #[tauri::command]
 pub async fn channel_tools_add_existing_skill(
-    room: String,
+    channel: String,
     skill: String,
 ) -> Result<String, String> {
-    let room = safe_arg("room", &room)?;
+    let channel = safe_arg("channel", &channel)?;
     let skill = safe_arg("skill", &skill)?;
+    let room = ensure_channel_room(&channel).await?;
     let out = run_harbor(vec![
         "skill-room-add".into(),
         "--skill".into(),
@@ -149,16 +171,17 @@ pub async fn channel_tools_add_existing_skill(
     text_output(out)
 }
 
-/// Install a brand-new skill (from a directory or SKILL.md path) into the pool
-/// and route it to this channel's room, so it is available here first.
+/// Install a brand-new skill (from a directory or SKILL.md path) and make it
+/// available in this channel first. Scopes the channel on the fly if needed.
 #[tauri::command]
 pub async fn channel_tools_add_new_skill(
-    room: String,
+    channel: String,
     source: String,
     name: Option<String>,
 ) -> Result<String, String> {
-    let room = safe_arg("room", &room)?;
+    let channel = safe_arg("channel", &channel)?;
     let source = safe_arg("source", &source)?;
+    let room = ensure_channel_room(&channel).await?;
     let mut args = vec![
         "skill-install".into(),
         "--source".into(),
@@ -176,17 +199,18 @@ pub async fn channel_tools_add_new_skill(
     text_output(out)
 }
 
-/// Add an MCP server to this channel's room.
+/// Add an MCP server to this channel. Scopes the channel on the fly if needed.
 #[tauri::command]
 pub async fn channel_tools_add_mcp(
-    room: String,
+    channel: String,
     name: String,
     command: String,
     args: Option<String>,
 ) -> Result<String, String> {
-    let room = safe_arg("room", &room)?;
+    let channel = safe_arg("channel", &channel)?;
     let name = safe_arg("name", &name)?;
     let command = safe_arg("command", &command)?;
+    let room = ensure_channel_room(&channel).await?;
     let mut argv = vec![
         "mcp-add".into(),
         "--room".into(),

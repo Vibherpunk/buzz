@@ -52,39 +52,39 @@ export function getPoolSkills(): Promise<PoolSkill[]> {
   return invokeTauri<PoolSkill[]>("channel_tools_pool_skills");
 }
 
-/** Grant an existing pool skill to this channel's room (additive). */
+/** Add an existing skill (from elsewhere in Buzz) to this channel. Scopes it on the fly. */
 export function addExistingSkillToChannel(
-  room: string,
+  channel: string,
   skill: string,
 ): Promise<string> {
   return invokeTauri<string>("channel_tools_add_existing_skill", {
-    room,
+    channel,
     skill,
   });
 }
 
-/** Install a brand-new skill from a path and route it to this channel's room. */
+/** Install a brand-new skill from a path and make it available in this channel first. */
 export function addNewSkillToChannel(
-  room: string,
+  channel: string,
   source: string,
   name?: string,
 ): Promise<string> {
   return invokeTauri<string>("channel_tools_add_new_skill", {
-    room,
+    channel,
     source,
     name,
   });
 }
 
-/** Add an MCP server to this channel's room. */
+/** Add an MCP server to this channel. Scopes it on the fly. */
 export function addMcpToChannel(
-  room: string,
+  channel: string,
   name: string,
   command: string,
   args?: string,
 ): Promise<string> {
   return invokeTauri<string>("channel_tools_add_mcp", {
-    room,
+    channel,
     name,
     command,
     args,

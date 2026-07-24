@@ -61,7 +61,7 @@ export function ChannelToolsDialog({
           <DialogDescription>
             Skills and MCP servers available to agents in{" "}
             <span className="font-medium text-foreground">{channelTitle}</span>.
-            Anything added here is scoped to this channel first.
+            Anything you add is available in this channel first.
           </DialogDescription>
         </DialogHeader>
 
@@ -78,8 +78,6 @@ export function ChannelToolsDialog({
                 : "Failed to load channel tools."
             }
           />
-        ) : toolsQuery.data && !toolsQuery.data.scoped ? (
-          <UnscopedNote />
         ) : toolsQuery.data ? (
           <ChannelToolsBody channelKey={channelKey} tools={toolsQuery.data} />
         ) : null}
@@ -95,8 +93,6 @@ function ChannelToolsBody({
   channelKey: string;
   tools: ChannelTools;
 }) {
-  const room = tools.room;
-
   return (
     <div className="flex max-h-[60vh] flex-col gap-5 overflow-y-auto pr-1">
       <section className="flex flex-col gap-2">
@@ -124,7 +120,7 @@ function ChannelToolsBody({
                         variant="outline"
                         className="shrink-0 text-2xs text-amber-600"
                       >
-                        missing from pool
+                        unavailable
                       </Badge>
                     ) : null}
                   </div>
@@ -138,13 +134,7 @@ function ChannelToolsBody({
             ))}
           </ul>
         )}
-        {room ? (
-          <AddSkillControls
-            channelKey={channelKey}
-            room={room}
-            present={tools.skills}
-          />
-        ) : null}
+        <AddSkillControls channelKey={channelKey} present={tools.skills} />
       </section>
 
       <section className="flex flex-col gap-2">
@@ -165,14 +155,11 @@ function ChannelToolsBody({
                 <span className="truncate text-sm font-medium">
                   {server.name}
                 </span>
-                <Badge variant="secondary" className="shrink-0 text-2xs">
-                  {server.source}
-                </Badge>
               </li>
             ))}
           </ul>
         )}
-        {room ? <AddMcpControls channelKey={channelKey} room={room} /> : null}
+        <AddMcpControls channelKey={channelKey} />
       </section>
     </div>
   );
@@ -181,11 +168,9 @@ function ChannelToolsBody({
 /** Add a skill — pick an existing pool skill, or install a new one from a path. */
 function AddSkillControls({
   channelKey,
-  room,
   present,
 }: {
   channelKey: string;
-  room: string;
   present: ChannelTools["skills"];
 }) {
   const queryClient = useQueryClient();
@@ -207,14 +192,14 @@ function AddSkillControls({
     queryClient.invalidateQueries({ queryKey: channelToolsKey(channelKey) });
 
   const addExisting = useMutation({
-    mutationFn: (skill: string) => addExistingSkillToChannel(room, skill),
+    mutationFn: (skill: string) => addExistingSkillToChannel(channelKey, skill),
     onSuccess: () => {
       void invalidate();
       setFilter("");
     },
   });
   const addNew = useMutation({
-    mutationFn: (path: string) => addNewSkillToChannel(room, path),
+    mutationFn: (path: string) => addNewSkillToChannel(channelKey, path),
     onSuccess: () => {
       void invalidate();
       setSource("");
@@ -278,7 +263,7 @@ function AddSkillControls({
           </div>
           {poolQuery.isLoading ? (
             <div className="flex items-center gap-2 px-1 py-2 text-xs text-muted-foreground">
-              <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading pool…
+              <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading skills…
             </div>
           ) : (
             <ul className="flex max-h-40 flex-col gap-1 overflow-y-auto">
@@ -292,9 +277,11 @@ function AddSkillControls({
                   >
                     <div className="min-w-0">
                       <div className="truncate text-sm">{skill.name}</div>
-                      <div className="truncate text-2xs text-muted-foreground">
-                        {skill.room}
-                      </div>
+                      {skill.description ? (
+                        <div className="truncate text-2xs text-muted-foreground">
+                          {skill.description}
+                        </div>
+                      ) : null}
                     </div>
                     <Button
                       disabled={pending}
@@ -357,14 +344,8 @@ function AddSkillControls({
   );
 }
 
-/** Add an MCP server (name + command) to the channel's room. */
-function AddMcpControls({
-  channelKey,
-  room,
-}: {
-  channelKey: string;
-  room: string;
-}) {
+/** Add an MCP server (name + command) to the channel. */
+function AddMcpControls({ channelKey }: { channelKey: string }) {
   const queryClient = useQueryClient();
   const [open, setOpen] = React.useState(false);
   const [name, setName] = React.useState("");
@@ -374,7 +355,7 @@ function AddMcpControls({
   const addMcp = useMutation({
     mutationFn: () =>
       addMcpToChannel(
-        room,
+        channelKey,
         name.trim(),
         command.trim(),
         args.trim() || undefined,
@@ -491,23 +472,6 @@ function ErrorNote({ message }: { message: string }) {
     <div className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
       <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
       <span className="break-words">{message}</span>
-    </div>
-  );
-}
-
-function UnscopedNote() {
-  return (
-    <div className="flex items-start gap-2 rounded-md border border-border/60 bg-muted/40 px-3 py-3 text-xs text-muted-foreground">
-      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-      <span>
-        This channel isn&apos;t scoped by Harbor, so its agents keep whatever
-        skills and extensions their harness is configured with. To manage tools
-        per channel, map it to a Harbor room in{" "}
-        <code className="rounded bg-background px-1">
-          ~/.buzz/channel-tools.toml
-        </code>
-        .
-      </span>
     </div>
   );
 }
