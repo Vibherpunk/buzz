@@ -719,6 +719,8 @@ pub fn run() {
             channel_tools_add_existing_skill,
             channel_tools_add_new_skill,
             channel_tools_add_mcp,
+            channel_tools_remove_skill,
+            channel_tools_remove_mcp,
             open_dm,
             hide_dm,
             get_channel_details,
