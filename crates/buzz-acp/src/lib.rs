@@ -3613,24 +3613,50 @@ fn normalized_agent_name(init_result: &serde_json::Value) -> String {
         .to_ascii_lowercase()
 }
 
+/// Shut down every agent in `slots` CONCURRENTLY rather than one at a time.
+///
+/// `AcpClient::shutdown()` already bounds itself per agent (kills the process
+/// group, waits up to 5s, gives up) - but running that sequentially across a
+/// pool meant total shutdown time scaled with pool size (worst case ~5s *
+/// pool size). That routinely exceeded the desktop app's SIGTERM-to-SIGKILL
+/// grace window on restart, so the harness got SIGKILLed mid-loop before
+/// later agents were ever reached - orphaning them for good, since a SIGKILL
+/// can't be caught and their process groups were deliberately isolated from
+/// the harness's own (see AcpClient::spawn) specifically so a signal to the
+/// harness wouldn't reach them either. Concurrent shutdown bounds total time
+/// at ~5s regardless of pool size, comfortably inside the lengthened grace
+/// window on the Tauri side (see terminate_process in the desktop crate).
 async fn shutdown_agent_slots(slots: &mut [Option<OwnedAgent>]) {
-    for slot in slots {
-        if let Some(mut agent) = slot.take() {
-            agent.acp.shutdown().await;
-        }
-    }
+    let agents: Vec<OwnedAgent> = slots.iter_mut().filter_map(|slot| slot.take()).collect();
+    futures_util::future::join_all(
+        agents
+            .into_iter()
+            .map(|mut agent| async move { agent.acp.shutdown().await }),
+    )
+    .await;
 }
 
 async fn shutdown_agent_pool(pool: &mut AgentPool) {
     pool.join_set.shutdown().await;
-    while let Ok(mut result) = pool.result_rx_try_recv() {
-        result.agent.acp.shutdown().await;
+    let mut agents: Vec<OwnedAgent> = Vec::new();
+    while let Ok(result) = pool.result_rx_try_recv() {
+        agents.push(result.agent);
     }
     for slot in pool.agents_mut() {
-        if let Some(mut agent) = slot.take() {
-            agent.acp.shutdown().await;
+        if let Some(agent) = slot.take() {
+            agents.push(agent);
         }
     }
+    // See shutdown_agent_slots' doc comment - same concurrent-shutdown fix,
+    // applied here too since this is the path actually used on harness
+    // restart/exit (shutdown_agent_slots covers a separate abandoned-pool
+    // path above).
+    futures_util::future::join_all(
+        agents
+            .into_iter()
+            .map(|mut agent| async move { agent.acp.shutdown().await }),
+    )
+    .await;
 }
 
 struct PoolStartup {

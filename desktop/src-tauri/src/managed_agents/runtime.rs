@@ -272,8 +272,18 @@ pub(crate) fn terminate_process(pid: u32) -> Result<(), String> {
     // Try graceful shutdown first (SIGTERM to the group).
     signal_process_group_or_leader(pid, libc::SIGTERM, "terminate")?;
 
-    // Wait up to 1s for graceful exit.
-    for _ in 0..10 {
+    // Wait up to 8s for graceful exit. The harness's own SIGTERM handler
+    // needs real time to shut down its agent pool (shutdown_agent_pool in
+    // buzz-acp, bounded at ~5s total after the 2026-07 concurrency fix) -
+    // the previous 1s budget was shorter than that worst case by
+    // construction, so a restart routinely escalated to SIGKILL before the
+    // harness finished, and SIGKILL can't be caught, so whatever pool
+    // members hadn't been reaped yet were abandoned as orphans (their
+    // process groups are deliberately isolated from the harness's own, see
+    // AcpClient::spawn, precisely so a signal here wouldn't reach them
+    // either). 8s gives ~3s of headroom over that bound without making a
+    // routine restart feel sluggish.
+    for _ in 0..80 {
         if !process_is_running(pid) {
             return Ok(());
         }
