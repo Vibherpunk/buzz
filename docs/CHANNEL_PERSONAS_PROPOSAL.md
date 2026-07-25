@@ -1,9 +1,11 @@
 # Proposal: channel-scoped personas (extends `channel-tools.toml`)
 
-> **Status: proposal — not built, not approved for implementation.** This touches
-> shared `buzz-acp` core session-creation logic; do not implement without explicit
-> sign-off and the testing bar below. Companion to the channel-scoped *tools*
-> feature (`crates/buzz-acp/src/channel_tools.rs` + the desktop panel).
+> **Status: implemented** — behind the testing bar below (unit tests + a
+> concurrent no-bleed test; clippy clean). **Opt-in and dormant by default:** a
+> channel with no `persona`/`persona_file` key behaves exactly as before, so
+> enabling this build changes nothing until a persona is configured. Companion to
+> the channel-scoped *tools* feature (`crates/buzz-acp/src/channel_tools.rs` + the
+> desktop panel).
 
 ## Problem this solves
 

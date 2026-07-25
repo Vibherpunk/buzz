@@ -766,10 +766,31 @@ async fn create_session_and_apply_model(
     // its own `[Agent Memory — core]` header, and canvas carries its own
     // `[Channel Canvas]` header; both are appended with a blank-line separator.
     let is_goose = agent.agent_name == "goose";
+
+    // Channel-scoped persona: a channel with a `persona`/`persona_file` entry
+    // REPLACES the agent's base `system_prompt` for sessions created there —
+    // never layered, appended, or merged. No entry keeps the base prompt. Same
+    // per-channel resolution (UUID first, then name) as tool-scoping, applied in
+    // this local so concurrent sessions on one process never cross prompts.
+    let effective_system_prompt = channel_id
+        .and_then(|cid| {
+            let name = ctx.channel_info.get(cid).map(|i| i.name.as_str());
+            ctx.channel_tools
+                .resolve_persona(cid, name)
+                .inspect(|_persona| {
+                    tracing::info!(
+                        channel = %cid,
+                        channel_name = name.unwrap_or("?"),
+                        "channel-scoped persona applied to new session"
+                    );
+                })
+        })
+        .or(ctx.system_prompt.as_deref());
+
     let combined_system_prompt = with_canvas(
         with_core(
             with_team(
-                framed_system_prompt(&ctx.cwd, ctx.base_prompt, ctx.system_prompt.as_deref()),
+                framed_system_prompt(&ctx.cwd, ctx.base_prompt, effective_system_prompt),
                 ctx.team_instructions.as_deref(),
             ),
             agent_core,
