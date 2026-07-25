@@ -14,12 +14,19 @@
 </p>
 
 > [!NOTE]
-> **This is a fork of [`block/buzz`](https://github.com/block/buzz).** The one thing
-> it adds is **channel-scoped tools**: map a channel to a [Harbor](https://github.com/TDH-Labs/Harbor)
-> room so every agent working there is confined to exactly that room's skills and MCP
-> tools — enforced server-side, managed from a **Channel tools** panel in the channel
-> header. Everything else is unmodified upstream Buzz.
-> **→ [What this fork adds](docs/CHANNEL_SCOPED_TOOLS.md)**
+> **This is a fork of [`block/buzz`](https://github.com/block/buzz).** It adds two
+> channel-scoped capabilities, each resolved per-session and enforced server-side:
+> - **Channel-scoped tools** — map a channel to a [Harbor](https://github.com/TDH-Labs/Harbor)
+>   room so every agent working there is confined to exactly that room's skills and MCP
+>   tools, managed from a **Channel tools** panel in the channel header.
+> - **Channel-scoped personas** — give a channel its own system prompt, so one agent
+>   identity can serve a different, self-contained persona per channel (fully replacing
+>   the base prompt, not layered). Opt-in: a channel with no persona behaves exactly as
+>   upstream, and a persona that can't be loaded fails at startup rather than silently
+>   running the wrong one.
+>
+> Everything else is unmodified upstream Buzz.
+> **→ [Channel-scoped tools](docs/CHANNEL_SCOPED_TOOLS.md) · [Channel-scoped personas](docs/CHANNEL_PERSONAS_PROPOSAL.md)**
 
 <p align="center">
   <img src="docs/assets/screenshots/channel-thread.png" alt="A Buzz project channel where people and an agent coordinate on a release plan" width="100%">
