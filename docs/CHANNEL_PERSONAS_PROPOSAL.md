@@ -84,6 +84,16 @@ room = "support"
 
 ## Explicitly out of scope for v1 (real gaps — flag for a future spec)
 
+- **Channel names in the policy are not validated against live channels at load.**
+  A missing/empty/unreadable `persona`/`persona_file` is fatal at load, but a channel
+  *name* that matches no real channel is **not** caught: the entry silently never
+  resolves and that channel keeps its base prompt. This is a pre-existing property of
+  the tool-scoping resolver (a mistyped channel name silently fails to scope tools
+  too), not new to personas — `buzz-acp` loads the policy with no live channel list,
+  resolving per-session by UUID then name. Closing it needs a channel-list source at
+  load time. Called out because it's the same failure shape as a plausible-but-wrong
+  identifier that reads as normal: fatal-at-load covers the *unresolvable-persona*
+  half, not this *wrong-but-resolvable-name* half.
 - **`respond_to`/`respond_to_allowlist` stay per-identity, not per-channel.** If one
   channel's persona genuinely needs a different trust boundary than another channel
   on the same shared identity, v1 doesn't solve that. Some identity splits may exist
