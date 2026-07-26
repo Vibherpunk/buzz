@@ -19,11 +19,14 @@
 > - **Channel-scoped tools** — map a channel to a [Harbor](https://github.com/TDH-Labs/Harbor)
 >   room so every agent working there is confined to exactly that room's skills and MCP
 >   tools, managed from a **Channel tools** panel in the channel header.
-> - **Channel-scoped personas** — give a channel its own system prompt, so one agent
->   identity can serve a different, self-contained persona per channel (fully replacing
->   the base prompt, not layered). Opt-in: a channel with no persona behaves exactly as
->   upstream, and a persona that can't be loaded fails at startup rather than silently
->   running the wrong one.
+> - **Channel-scoped personas** — a channel's persona (system prompt) is **auto-derived
+>   from its Harbor room's `agents/*.md`**, the same no-import way skills/MCP are, and
+>   managed from the same **Channel tools** panel: pick a different room persona, write a
+>   custom one, **edit the canonical room persona in place**, or remove. It's **replacing,
+>   not layered** — the room persona takes precedence over the agent's own for sessions in
+>   that channel, so one identity can behave as a different, self-contained persona per
+>   channel. Opt-in: a channel with no persona behaves exactly as upstream, and one that
+>   can't be loaded fails at startup rather than silently running the wrong one.
 >
 > Everything else is unmodified upstream Buzz.
 > **→ [Channel-scoped tools](docs/CHANNEL_SCOPED_TOOLS.md) · [Channel-scoped personas](docs/CHANNEL_PERSONAS_PROPOSAL.md)**
