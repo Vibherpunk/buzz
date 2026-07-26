@@ -6,6 +6,7 @@ import {
   Plug,
   Puzzle,
   Search,
+  UserRound,
   X,
 } from "lucide-react";
 import * as React from "react";
@@ -14,10 +15,15 @@ import {
   addExistingSkillToChannel,
   addMcpToChannel,
   addNewSkillToChannel,
+  getChannelPersona,
   getChannelTools,
   getPoolSkills,
+  removeChannelPersona,
   removeMcpFromChannel,
   removeSkillFromChannel,
+  setChannelPersonaFile,
+  setChannelPersonaInline,
+  type ChannelPersona,
   type ChannelTools,
   type PoolSkill,
 } from "@/shared/api/tauriChannelTools";
@@ -43,6 +49,8 @@ type ChannelToolsDialogProps = {
 const channelToolsKey = (channel: string) =>
   ["channel-tools", channel] as const;
 const poolSkillsKey = ["channel-tools", "pool-skills"] as const;
+const channelPersonaKey = (channel: string) =>
+  ["channel-persona", channel] as const;
 
 export function ChannelToolsDialog({
   channelKey,
@@ -116,6 +124,8 @@ function ChannelToolsBody({
   return (
     <div className="flex max-h-[60vh] flex-col gap-5 overflow-y-auto pr-1">
       {removeError ? <ErrorNote message={removeError} /> : null}
+      <PersonaSection channelKey={channelKey} />
+
       <section className="flex flex-col gap-2">
         <SectionHeading
           icon={<Puzzle className="h-4 w-4" />}
@@ -198,6 +208,222 @@ function ChannelToolsBody({
         <AddMcpControls channelKey={channelKey} />
       </section>
     </div>
+  );
+}
+
+function personaSourceLabel(source: string): string {
+  if (source === "override-inline") return "custom";
+  if (source === "override-file") return "custom file";
+  return "from room";
+}
+
+/**
+ * The channel's persona (system prompt). Auto-derived from the channel's room —
+ * exactly like skills/MCP — with the option to pick a different room persona,
+ * write a custom one, or remove the override.
+ */
+function PersonaSection({ channelKey }: { channelKey: string }) {
+  const queryClient = useQueryClient();
+  const personaQuery = useQuery({
+    queryKey: channelPersonaKey(channelKey),
+    queryFn: () => getChannelPersona(channelKey),
+  });
+  const invalidate = () =>
+    queryClient.invalidateQueries({ queryKey: channelPersonaKey(channelKey) });
+
+  const setFile = useMutation({
+    mutationFn: (file: string) => setChannelPersonaFile(channelKey, file),
+    onSuccess: invalidate,
+  });
+  const setInline = useMutation({
+    mutationFn: (text: string) => setChannelPersonaInline(channelKey, text),
+    onSuccess: invalidate,
+  });
+  const remove = useMutation({
+    mutationFn: () => removeChannelPersona(channelKey),
+    onSuccess: invalidate,
+  });
+
+  const [mode, setMode] = React.useState<null | "pick" | "custom">(null);
+  const [customText, setCustomText] = React.useState("");
+
+  const data: ChannelPersona | undefined = personaQuery.data;
+  const busy = setFile.isPending || setInline.isPending || remove.isPending;
+  const mutationError =
+    (setFile.error instanceof Error && setFile.error.message) ||
+    (setInline.error instanceof Error && setInline.error.message) ||
+    (remove.error instanceof Error && remove.error.message) ||
+    null;
+
+  return (
+    <section className="flex flex-col gap-2">
+      <SectionHeading
+        icon={<UserRound className="h-4 w-4" />}
+        title="Persona"
+        count={data?.effective ? 1 : 0}
+      />
+      {personaQuery.isLoading ? (
+        <div className="flex items-center gap-2 px-1 py-2 text-xs text-muted-foreground">
+          <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading persona…
+        </div>
+      ) : personaQuery.isError ? (
+        <ErrorNote
+          message={
+            personaQuery.error instanceof Error
+              ? personaQuery.error.message
+              : "Failed to load persona."
+          }
+        />
+      ) : data ? (
+        <React.Fragment>
+          {data.effective ? (
+            <div className="flex items-start justify-between gap-2 rounded-md border border-border/50 bg-muted/30 px-3 py-2">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="truncate text-sm font-medium">
+                    {data.effective.name}
+                  </span>
+                  <Badge
+                    variant="outline"
+                    className="shrink-0 text-2xs text-muted-foreground"
+                  >
+                    {personaSourceLabel(data.effective.source)}
+                  </Badge>
+                </div>
+                {data.effective.preview ? (
+                  <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
+                    {data.effective.preview}
+                  </p>
+                ) : null}
+              </div>
+              {data.overridden ? (
+                <RemoveButton
+                  label="Remove persona"
+                  pending={remove.isPending}
+                  onClick={() => remove.mutate()}
+                />
+              ) : null}
+            </div>
+          ) : data.ambiguous ? (
+            <EmptyRow>
+              This channel’s room has several personas — pick the one this
+              channel should use.
+            </EmptyRow>
+          ) : (
+            <EmptyRow>
+              No persona — agents here use their own base prompt.
+            </EmptyRow>
+          )}
+
+          {mode === "pick" ? (
+            <div className="flex flex-col gap-1 rounded-md border border-border/50 p-2">
+              {data.roomOptions.length === 0 ? (
+                <EmptyRow>This channel’s room has no personas.</EmptyRow>
+              ) : (
+                <ul className="flex max-h-40 flex-col gap-1 overflow-y-auto">
+                  {data.roomOptions.map((opt) => (
+                    <li
+                      className="flex items-center justify-between gap-2 rounded px-2 py-1.5 hover:bg-muted/50"
+                      key={opt.path}
+                    >
+                      <div className="min-w-0">
+                        <div className="truncate text-sm">{opt.name}</div>
+                        {opt.preview ? (
+                          <div className="truncate text-2xs text-muted-foreground">
+                            {opt.preview}
+                          </div>
+                        ) : null}
+                      </div>
+                      <Button
+                        disabled={busy}
+                        onClick={() =>
+                          setFile.mutate(opt.path, {
+                            onSuccess: () => setMode(null),
+                          })
+                        }
+                        size="sm"
+                        type="button"
+                        variant="ghost"
+                      >
+                        Use
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <button
+                className="self-start text-2xs text-muted-foreground hover:text-foreground"
+                onClick={() => setMode(null)}
+                type="button"
+              >
+                Cancel
+              </button>
+            </div>
+          ) : mode === "custom" ? (
+            <div className="flex flex-col gap-2 rounded-md border border-border/50 p-2">
+              <textarea
+                className="min-h-[120px] w-full resize-y rounded-md border border-border/50 bg-background px-3 py-2 text-sm"
+                onChange={(e) => setCustomText(e.target.value)}
+                placeholder="Write this channel’s system prompt…"
+                value={customText}
+              />
+              <div className="flex items-center justify-end gap-2">
+                <button
+                  className="text-2xs text-muted-foreground hover:text-foreground"
+                  onClick={() => setMode(null)}
+                  type="button"
+                >
+                  Cancel
+                </button>
+                <Button
+                  disabled={busy || customText.trim() === ""}
+                  onClick={() =>
+                    setInline.mutate(customText, {
+                      onSuccess: () => {
+                        setCustomText("");
+                        setMode(null);
+                      },
+                    })
+                  }
+                  size="sm"
+                  type="button"
+                  variant="default"
+                >
+                  {setInline.isPending ? (
+                    <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                  ) : null}
+                  Save persona
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex gap-2">
+              {data.roomOptions.length > 0 ? (
+                <Button
+                  onClick={() => setMode("pick")}
+                  size="sm"
+                  type="button"
+                  variant="outline"
+                >
+                  <UserRound className="mr-1.5 h-4 w-4" />
+                  {data.effective ? "Change persona" : "Choose room persona"}
+                </Button>
+              ) : null}
+              <Button
+                onClick={() => setMode("custom")}
+                size="sm"
+                type="button"
+                variant="outline"
+              >
+                Write custom
+              </Button>
+            </div>
+          )}
+
+          {mutationError ? <ErrorNote message={mutationError} /> : null}
+        </React.Fragment>
+      ) : null}
+    </section>
   );
 }
 

@@ -106,3 +106,79 @@ export function addMcpToChannel(
     args,
   });
 }
+
+/** One persona a channel's room offers (for the picker). */
+export type RoomPersona = {
+  name: string;
+  path: string;
+  preview: string;
+};
+
+/** The persona a channel effectively runs under (shape of `harbor channel-persona <c> --json`). */
+export type ChannelPersona = {
+  channel: string;
+  room: string | null;
+  /** The persona in effect, or null when the channel has none (uses base prompt). */
+  effective: {
+    name: string;
+    path: string | null;
+    inline: string | null;
+    source: "override-file" | "override-inline" | "room";
+    preview: string;
+  } | null;
+  /** Every persona the mapped room offers. */
+  roomOptions: RoomPersona[];
+  /** True when the room has several personas and none matches the channel name. */
+  ambiguous: boolean;
+  /** True when an explicit override is set (vs auto-derived from the room). */
+  overridden: boolean;
+};
+
+/** Result of auto-applying a channel's room persona. */
+export type SyncPersonaResult = {
+  channel: string;
+  synced: boolean;
+  path?: string;
+  reason?: string;
+};
+
+/** Resolve the persona a channel runs under (auto-derived from its room, or overridden). */
+export function getChannelPersona(channel: string): Promise<ChannelPersona> {
+  return invokeTauri<ChannelPersona>("channel_tools_get_persona", { channel });
+}
+
+/** Auto-apply the channel's room persona when unambiguous (no-op with a reason otherwise). */
+export function syncChannelPersona(
+  channel: string,
+): Promise<SyncPersonaResult> {
+  return invokeTauri<SyncPersonaResult>("channel_tools_sync_persona", {
+    channel,
+  });
+}
+
+/** Override a channel's persona with a specific file (e.g. a room persona from the picker). */
+export function setChannelPersonaFile(
+  channel: string,
+  file: string,
+): Promise<string> {
+  return invokeTauri<string>("channel_tools_set_persona_file", {
+    channel,
+    file,
+  });
+}
+
+/** Override a channel's persona with custom text. */
+export function setChannelPersonaInline(
+  channel: string,
+  text: string,
+): Promise<string> {
+  return invokeTauri<string>("channel_tools_set_persona_inline", {
+    channel,
+    text,
+  });
+}
+
+/** Remove a channel's persona override (revert to room-derived, or none). */
+export function removeChannelPersona(channel: string): Promise<string> {
+  return invokeTauri<string>("channel_tools_remove_persona", { channel });
+}

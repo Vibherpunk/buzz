@@ -252,6 +252,84 @@ pub async fn channel_tools_add_new_skill(
     text_output(out)
 }
 
+/// Resolve the persona a channel runs under: its room's persona (auto-derived,
+/// like skills/MCP) or an explicit override. Shape mirrors `harbor
+/// channel-persona --json`: `{ channel, room, effective, roomOptions[],
+/// ambiguous, overridden }`.
+#[tauri::command]
+pub async fn channel_tools_get_persona(channel: String) -> Result<Value, String> {
+    let channel = safe_arg("channel", &channel)?;
+    let out = run_harbor(vec!["channel-persona".into(), channel, "--json".into()]).await?;
+    json_output(out)
+}
+
+/// Auto-apply a channel's room persona when unambiguous (points `persona_file`
+/// at the live room file). No-op with a reason when the channel has an override
+/// or the room is ambiguous. Returns `{ channel, synced, path?, reason? }`.
+#[tauri::command]
+pub async fn channel_tools_sync_persona(channel: String) -> Result<Value, String> {
+    let channel = safe_arg("channel", &channel)?;
+    let out = run_harbor(vec![
+        "channel-persona".into(),
+        channel,
+        "--sync".into(),
+        "--json".into(),
+    ])
+    .await?;
+    json_output(out)
+}
+
+/// Override a channel's persona with a specific file (typically one of the
+/// room's persona files chosen from the picker).
+#[tauri::command]
+pub async fn channel_tools_set_persona_file(
+    channel: String,
+    file: String,
+) -> Result<String, String> {
+    let channel = safe_arg("channel", &channel)?;
+    let file = file.trim();
+    if file.is_empty() {
+        return Err("file must not be empty".into());
+    }
+    // `--flag=value` (single argv) so a value is never mis-read as a flag.
+    let out = run_harbor(vec![
+        "channel-persona".into(),
+        channel,
+        format!("--set-file={file}"),
+    ])
+    .await?;
+    text_output(out)
+}
+
+/// Override a channel's persona with custom text (stored under
+/// `~/.buzz/personas/` and referenced by `persona_file`).
+#[tauri::command]
+pub async fn channel_tools_set_persona_inline(
+    channel: String,
+    text: String,
+) -> Result<String, String> {
+    let channel = safe_arg("channel", &channel)?;
+    if text.trim().is_empty() {
+        return Err("persona text must not be empty".into());
+    }
+    let out = run_harbor(vec![
+        "channel-persona".into(),
+        channel,
+        format!("--set-inline={text}"),
+    ])
+    .await?;
+    text_output(out)
+}
+
+/// Remove a channel's persona override, reverting to the room-derived persona
+/// (or none).
+#[tauri::command]
+pub async fn channel_tools_remove_persona(channel: String) -> Result<String, String> {
+    let channel = safe_arg("channel", &channel)?;
+    let out = run_harbor(vec!["channel-persona".into(), channel, "--remove".into()]).await?;
+    text_output(out)
+}
+
 /// Add an MCP server to this channel. Scopes the channel on the fly if needed.
 #[tauri::command]
 pub async fn channel_tools_add_mcp(

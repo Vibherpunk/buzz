@@ -131,7 +131,9 @@ const overrides = new Map([
   // record_provider param + applies persona_field_with_record_fallback. +5 lines.
   // global-agent-config: spawn_agent_child loads global config and merges as
   // lowest env layer (+8 lines). Queued to split.
-  ["src-tauri/src/managed_agents/runtime.rs", 2216],
+  // block/main merge + concurrent-shutdown/SIGTERM-grace fix: +7 lines of
+  // legitimate merged upstream + fix code. Still queued to split.
+  ["src-tauri/src/managed_agents/runtime.rs", 2223],
   // config-bridge setup-payload env-boundary fix adds readiness wiring in
   // spawn_agent_child; load-bearing security fix, queued to split.
   ["src-tauri/src/managed_agents/config_bridge/reader.rs", 1016],
