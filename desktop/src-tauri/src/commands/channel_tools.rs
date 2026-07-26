@@ -321,6 +321,30 @@ pub async fn channel_tools_set_persona_inline(
     text_output(out)
 }
 
+/// Edit the canonical room persona file (its full text). The change applies to
+/// every channel that uses this persona — this edits the source of truth, not a
+/// channel-specific copy.
+#[tauri::command]
+pub async fn channel_tools_edit_room_persona(
+    room: String,
+    name: String,
+    text: String,
+) -> Result<String, String> {
+    let room = safe_arg("room", &room)?;
+    let name = safe_arg("name", &name)?;
+    if text.trim().is_empty() {
+        return Err("persona text must not be empty".into());
+    }
+    let out = run_harbor(vec![
+        "room-persona".into(),
+        room,
+        name,
+        format!("--set-body={text}"),
+    ])
+    .await?;
+    text_output(out)
+}
+
 /// Remove a channel's persona override, reverting to the room-derived persona
 /// (or none).
 #[tauri::command]

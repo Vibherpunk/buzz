@@ -125,6 +125,8 @@ export type ChannelPersona = {
     inline: string | null;
     source: "override-file" | "override-inline" | "room";
     preview: string;
+    /** The full prompt text, for in-place editing. */
+    body: string;
   } | null;
   /** Every persona the mapped room offers. */
   roomOptions: RoomPersona[];
@@ -174,6 +176,19 @@ export function setChannelPersonaInline(
 ): Promise<string> {
   return invokeTauri<string>("channel_tools_set_persona_inline", {
     channel,
+    text,
+  });
+}
+
+/** Edit the canonical room persona's full text (applies to every channel that uses it). */
+export function editRoomPersona(
+  room: string,
+  name: string,
+  text: string,
+): Promise<string> {
+  return invokeTauri<string>("channel_tools_edit_room_persona", {
+    room,
+    name,
     text,
   });
 }

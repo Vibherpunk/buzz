@@ -728,6 +728,7 @@ pub fn run() {
             channel_tools_sync_persona,
             channel_tools_set_persona_file,
             channel_tools_set_persona_inline,
+            channel_tools_edit_room_persona,
             channel_tools_remove_persona,
             open_dm,
             hide_dm,

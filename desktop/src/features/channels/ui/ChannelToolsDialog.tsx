@@ -3,6 +3,7 @@ import {
   AlertTriangle,
   Blocks,
   Loader2,
+  Pencil,
   Plug,
   Puzzle,
   Search,
@@ -15,6 +16,7 @@ import {
   addExistingSkillToChannel,
   addMcpToChannel,
   addNewSkillToChannel,
+  editRoomPersona,
   getChannelPersona,
   getChannelTools,
   getPoolSkills,
@@ -243,17 +245,48 @@ function PersonaSection({ channelKey }: { channelKey: string }) {
     mutationFn: () => removeChannelPersona(channelKey),
     onSuccess: invalidate,
   });
+  const editRoom = useMutation({
+    mutationFn: (v: { room: string; name: string; text: string }) =>
+      editRoomPersona(v.room, v.name, v.text),
+    onSuccess: invalidate,
+  });
 
-  const [mode, setMode] = React.useState<null | "pick" | "custom">(null);
+  const [mode, setMode] = React.useState<null | "pick" | "custom" | "edit">(
+    null,
+  );
   const [customText, setCustomText] = React.useState("");
 
   const data: ChannelPersona | undefined = personaQuery.data;
-  const busy = setFile.isPending || setInline.isPending || remove.isPending;
+  const busy =
+    setFile.isPending ||
+    setInline.isPending ||
+    remove.isPending ||
+    editRoom.isPending;
   const mutationError =
     (setFile.error instanceof Error && setFile.error.message) ||
     (setInline.error instanceof Error && setInline.error.message) ||
     (remove.error instanceof Error && remove.error.message) ||
+    (editRoom.error instanceof Error && editRoom.error.message) ||
     null;
+
+  // Save from the editor: editing a ROOM persona rewrites the canonical room
+  // file (affects every channel using it); editing anything else re-saves a
+  // channel-scoped custom override.
+  const saveEditor = () => {
+    if (data?.effective?.source === "room" && data.room) {
+      editRoom.mutate(
+        { room: data.room, name: data.effective.name, text: customText },
+        { onSuccess: () => setMode(null) },
+      );
+    } else {
+      setInline.mutate(customText, {
+        onSuccess: () => {
+          setCustomText("");
+          setMode(null);
+        },
+      });
+    }
+  };
 
   return (
     <section className="flex flex-col gap-2">
@@ -296,13 +329,27 @@ function PersonaSection({ channelKey }: { channelKey: string }) {
                   </p>
                 ) : null}
               </div>
-              {data.overridden ? (
-                <RemoveButton
-                  label="Remove persona"
-                  pending={remove.isPending}
-                  onClick={() => remove.mutate()}
-                />
-              ) : null}
+              <div className="flex shrink-0 items-center gap-1">
+                <button
+                  aria-label="Edit persona"
+                  className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                  onClick={() => {
+                    setCustomText(data.effective?.body ?? "");
+                    setMode("edit");
+                  }}
+                  title="Edit persona"
+                  type="button"
+                >
+                  <Pencil className="h-4 w-4" />
+                </button>
+                {data.overridden ? (
+                  <RemoveButton
+                    label="Remove persona"
+                    pending={remove.isPending}
+                    onClick={() => remove.mutate()}
+                  />
+                ) : null}
+              </div>
             </div>
           ) : data.ambiguous ? (
             <EmptyRow>
@@ -359,10 +406,17 @@ function PersonaSection({ channelKey }: { channelKey: string }) {
                 Cancel
               </button>
             </div>
-          ) : mode === "custom" ? (
+          ) : mode === "custom" || mode === "edit" ? (
             <div className="flex flex-col gap-2 rounded-md border border-border/50 p-2">
+              {mode === "edit" && data.effective?.source === "room" ? (
+                <p className="text-2xs text-amber-600">
+                  Editing the room persona
+                  <span className="font-medium"> “{data.effective.name}”</span>{" "}
+                  — this changes it for every channel that uses it.
+                </p>
+              ) : null}
               <textarea
-                className="min-h-[120px] w-full resize-y rounded-md border border-border/50 bg-background px-3 py-2 text-sm"
+                className="min-h-[160px] w-full resize-y rounded-md border border-border/50 bg-background px-3 py-2 text-sm font-mono"
                 onChange={(e) => setCustomText(e.target.value)}
                 placeholder="Write this channel’s system prompt…"
                 value={customText}
@@ -377,22 +431,25 @@ function PersonaSection({ channelKey }: { channelKey: string }) {
                 </button>
                 <Button
                   disabled={busy || customText.trim() === ""}
-                  onClick={() =>
-                    setInline.mutate(customText, {
-                      onSuccess: () => {
-                        setCustomText("");
-                        setMode(null);
-                      },
-                    })
+                  onClick={
+                    mode === "edit"
+                      ? saveEditor
+                      : () =>
+                          setInline.mutate(customText, {
+                            onSuccess: () => {
+                              setCustomText("");
+                              setMode(null);
+                            },
+                          })
                   }
                   size="sm"
                   type="button"
                   variant="default"
                 >
-                  {setInline.isPending ? (
+                  {busy ? (
                     <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
                   ) : null}
-                  Save persona
+                  {mode === "edit" ? "Save changes" : "Save persona"}
                 </Button>
               </div>
             </div>
