@@ -29,7 +29,7 @@
 >   can't be loaded fails at startup rather than silently running the wrong one.
 >
 > Everything else is unmodified upstream Buzz.
-> **→ [Channel-scoped tools](docs/CHANNEL_SCOPED_TOOLS.md) · [Channel-scoped personas](docs/CHANNEL_PERSONAS_PROPOSAL.md)**
+> **→ [Channel-scoped tools](docs/CHANNEL_SCOPED_TOOLS.md) · [Channel-scoped personas](docs/CHANNEL_PERSONAS.md)**
 
 <p align="center">
   <img src="docs/assets/screenshots/channel-thread.png" alt="A Buzz project channel where people and an agent coordinate on a release plan" width="100%">
