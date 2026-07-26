@@ -13,9 +13,17 @@
 //! exposes exactly the listed servers and nothing else. Channels without an
 //! entry keep today's behavior.
 //!
+//! `baseline_mcp` is the one cross-cutting addition: commands listed there are
+//! appended to *every* scoped channel (deduped), harness-agnostic, so a harness
+//! that replaces its tool set with the explicit list (Goose) keeps a working
+//! execution baseline (e.g. `buzz-dev-mcp` for shell). Confinement is preserved —
+//! the baseline is a bounded, explicit set — and unscoped/persona-only channels
+//! get nothing.
+//!
 //! ```toml
 //! # ~/.buzz/channel-tools.toml
 //! harbor_command = "harbor"                        # default for `room` entries
+//! baseline_mcp = ["buzz-dev-mcp"]                  # execution tools every scoped channel keeps
 //!
 //! [channels.bookkeeping]          # channel name…
 //! room = "bookkeeping"
@@ -80,6 +88,13 @@ struct ChannelToolsFile {
     /// Default harbor binary for `room` entries. Defaults to `"harbor"` (PATH).
     #[serde(default)]
     harbor_command: Option<String>,
+    /// Execution-baseline MCP server commands appended to EVERY scoped channel,
+    /// for any harness (e.g. `["buzz-dev-mcp"]` for shell). Harnesses that replace
+    /// their tool set with an explicit list (Goose) keep these; a scoped channel
+    /// therefore has the room's skills + this baseline. Bare commands, resolved via
+    /// the agent process's PATH. Not added to unscoped/persona-only channels.
+    #[serde(default)]
+    baseline_mcp: Vec<String>,
     #[serde(default)]
     channels: HashMap<String, ChannelToolsEntry>,
 }
@@ -109,9 +124,38 @@ impl ChannelTools {
         let default_harbor = file.harbor_command.as_deref().unwrap_or("harbor");
         let mut tools = ChannelTools::default();
 
+        // Execution-baseline servers appended to every scoped channel (see the
+        // field doc). Bare commands → name is the file stem, no args/env.
+        let mut baseline: Vec<McpServer> = Vec::with_capacity(file.baseline_mcp.len());
+        for cmd in &file.baseline_mcp {
+            if cmd.trim().is_empty() {
+                return Err("channel-tools: baseline_mcp entries must not be empty".to_string());
+            }
+            baseline.push(McpServer {
+                name: Path::new(cmd)
+                    .file_stem()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or(cmd)
+                    .to_string(),
+                command: cmd.clone(),
+                args: vec![],
+                env: vec![],
+            });
+        }
+
         for (key, entry) in &file.channels {
             entry.validate(key)?;
-            let servers = entry.to_servers(default_harbor);
+            let mut servers = entry.to_servers(default_harbor);
+            // Append the baseline to any channel that is actually scoped (has
+            // servers), deduped by name. Unscoped/persona-only channels get
+            // nothing — the harness keeps its own full tool set there.
+            if !servers.is_empty() {
+                for b in &baseline {
+                    if !servers.iter().any(|s| s.name == b.name) {
+                        servers.push(b.clone());
+                    }
+                }
+            }
             let persona = entry.read_persona(key)?;
             match key.parse::<Uuid>() {
                 Ok(uuid) => {
@@ -329,6 +373,61 @@ mod tests {
         let t = load_str("[channels.bookkeeping]\nroom = \"bookkeeping\"\n").unwrap();
         assert!(t.resolve(&Uuid::nil(), Some("marketing")).is_none());
         assert!(t.resolve(&Uuid::nil(), None).is_none());
+    }
+
+    #[test]
+    fn baseline_mcp_appended_to_every_scoped_channel() {
+        let t = load_str("baseline_mcp = [\"buzz-dev-mcp\"]\n[channels.legal]\nroom = \"legal\"\n")
+            .unwrap();
+        let servers = t.resolve(&Uuid::nil(), Some("legal")).unwrap();
+        assert_eq!(
+            servers.iter().map(|s| s.name.as_str()).collect::<Vec<_>>(),
+            ["harbor-legal", "buzz-dev-mcp"],
+        );
+        // bare command → command == the string, no args/env
+        let dev = servers.iter().find(|s| s.name == "buzz-dev-mcp").unwrap();
+        assert_eq!(dev.command, "buzz-dev-mcp");
+        assert!(dev.args.is_empty() && dev.env.is_empty());
+    }
+
+    #[test]
+    fn baseline_mcp_deduped_when_channel_already_lists_it() {
+        let t = load_str(
+            "baseline_mcp = [\"buzz-dev-mcp\"]\n[channels.legal]\nroom = \"legal\"\n[[channels.legal.mcp]]\nname = \"buzz-dev-mcp\"\ncommand = \"buzz-dev-mcp\"\n",
+        )
+        .unwrap();
+        let servers = t.resolve(&Uuid::nil(), Some("legal")).unwrap();
+        assert_eq!(
+            servers.iter().filter(|s| s.name == "buzz-dev-mcp").count(),
+            1,
+        );
+    }
+
+    #[test]
+    fn baseline_mcp_not_added_to_persona_only_channel() {
+        // A channel with only an inline persona (no room/mcp) produces no servers,
+        // so it isn't scoped and gets no baseline — the harness keeps its own tools.
+        let t = load_str(
+            "baseline_mcp = [\"buzz-dev-mcp\"]\n[channels.support]\npersona = \"You are support.\"\n",
+        )
+        .unwrap();
+        assert!(t.resolve(&Uuid::nil(), Some("support")).is_none());
+        assert!(t.resolve_persona(&Uuid::nil(), Some("support")).is_some());
+    }
+
+    #[test]
+    fn baseline_mcp_name_derives_from_path_stem() {
+        let t =
+            load_str("baseline_mcp = [\"/opt/bin/foo-mcp\"]\n[channels.legal]\nroom = \"legal\"\n")
+                .unwrap();
+        let servers = t.resolve(&Uuid::nil(), Some("legal")).unwrap();
+        let extra = servers.iter().find(|s| s.name == "foo-mcp").unwrap();
+        assert_eq!(extra.command, "/opt/bin/foo-mcp");
+    }
+
+    #[test]
+    fn empty_baseline_entry_is_fatal() {
+        assert!(load_str("baseline_mcp = [\"\"]\n[channels.legal]\nroom = \"legal\"\n").is_err());
     }
 
     #[test]

@@ -18,10 +18,10 @@ export type ChannelSkill = {
   present: boolean;
 };
 
-/** An MCP server exposed in a channel: room-configured, or declared inline in the policy. */
+/** An MCP server exposed in a channel: room-configured, declared inline, or the policy baseline. */
 export type ChannelMcpServer = {
   name: string;
-  source: "room" | "explicit";
+  source: "room" | "explicit" | "baseline";
 };
 
 /** The fully-resolved toolset a channel exposes (shape of `harbor channel-tools <c> --json`). */

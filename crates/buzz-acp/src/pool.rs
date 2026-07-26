@@ -798,37 +798,6 @@ const CONTROL_CANCEL_GRACE: Duration = Duration::from_secs(5);
 /// Timeout for permission-mode requests (`session/set_config_option` with `configId: "mode"`).
 const PERMISSION_MODE_TIMEOUT: Duration = Duration::from_secs(5);
 
-/// Ensure a channel-scoped Goose server list includes `buzz-dev-mcp` (which
-/// exposes shell). Goose replaces its whole tool set with an explicit list
-/// (dropping its own shell extension); channel-tools scoping always passes one,
-/// so a scoped Goose agent would otherwise have skills but no execution.
-///
-/// If the agent already has a configured `buzz-dev-mcp` default server (rare —
-/// only when `mcp_command` is set), reuse it so its env carries over; otherwise
-/// construct a minimal one. `buzz-dev-mcp` is a bundled sidecar resolved by bare
-/// name via the augmented PATH the desktop app gives the agent process, and its
-/// shell tool needs no args and no startup env. Deduped so a room that already
-/// lists it isn't doubled. Only called for Goose — Claude's shell is built-in.
-fn mcp_servers_with_goose_shell(
-    mut scoped: Vec<McpServer>,
-    default_servers: &[McpServer],
-) -> Vec<McpServer> {
-    const DEV_MCP: &str = "buzz-dev-mcp";
-    if scoped.iter().any(|s| s.name == DEV_MCP) {
-        return scoped;
-    }
-    match default_servers.iter().find(|s| s.name == DEV_MCP) {
-        Some(configured) => scoped.push(configured.clone()),
-        None => scoped.push(McpServer {
-            name: DEV_MCP.into(),
-            command: DEV_MCP.into(),
-            args: vec![],
-            env: vec![],
-        }),
-    }
-    scoped
-}
-
 /// Create a new ACP session via `session_new_full()`, populate model capabilities
 /// on the agent (first session only), and apply `desired_model` if set.
 ///
@@ -894,37 +863,24 @@ async fn create_session_and_apply_model(
     // MCP set for its session. The agent runtime skips its own configured
     // extensions whenever explicit servers are passed, so a scoped channel
     // exposes exactly the listed servers.
-    let scoped_mcp = channel_id.and_then(|cid| {
-        ctx.channel_tools.resolve(cid, channel_name).map(|servers| {
-            tracing::info!(
-                channel = %cid,
-                channel_name = channel_name.unwrap_or("?"),
-                servers = servers.len(),
-                "channel-scoped tools applied to new session"
-            );
-            servers.clone()
+    // A scoped channel's server list already includes the policy's baseline
+    // execution tools (e.g. buzz-dev-mcp for shell), appended at load time in
+    // channel_tools.rs — harness-agnostic, so a harness that replaces its tool
+    // set with an explicit list (Goose) keeps a working baseline without any
+    // harness-specific handling here.
+    let mcp_servers = channel_id
+        .and_then(|cid| {
+            ctx.channel_tools.resolve(cid, channel_name).map(|servers| {
+                tracing::info!(
+                    channel = %cid,
+                    channel_name = channel_name.unwrap_or("?"),
+                    servers = servers.len(),
+                    "channel-scoped tools applied to new session"
+                );
+                servers.clone()
+            })
         })
-    });
-    // Goose REPLACES (not augments) its tool set when handed an explicit MCP
-    // server list, so it stops loading its own local extensions — including the
-    // one that provides shell. channel-tools scoping always passes an explicit
-    // list, which would leave a scoped Goose agent with the room's skills but no
-    // way to run anything. So for Goose specifically, re-add the default dev-mcp
-    // server(s) (which expose shell) whenever scoping applies. Claude's shell is a
-    // built-in capability, unaffected by the server list, so this never runs for it.
-    let channel_scoped = scoped_mcp.is_some();
-    let mut mcp_servers = scoped_mcp.unwrap_or_else(|| ctx.mcp_servers.clone());
-    if is_goose && channel_scoped {
-        let before = mcp_servers.len();
-        mcp_servers = mcp_servers_with_goose_shell(mcp_servers, &ctx.mcp_servers);
-        if mcp_servers.len() != before {
-            tracing::info!(
-                channel_name = channel_name.unwrap_or("?"),
-                added = mcp_servers.len() - before,
-                "re-added dev-mcp (shell) to a channel-scoped Goose session"
-            );
-        }
-    }
+        .unwrap_or_else(|| ctx.mcp_servers.clone());
 
     let resp = agent
         .acp
@@ -3754,57 +3710,6 @@ mod tests {
     use super::*;
     use nostr::{EventBuilder, Keys, Kind, Tag, Timestamp};
     use serde_json::json;
-
-    fn test_mcp(name: &str) -> McpServer {
-        McpServer {
-            name: name.into(),
-            command: name.into(),
-            args: vec![],
-            env: vec![],
-        }
-    }
-
-    #[test]
-    fn goose_shell_reuses_configured_dev_mcp_when_present() {
-        // With a configured buzz-dev-mcp default (mcp_command set), reuse it so
-        // its env carries over.
-        let mut configured = test_mcp("buzz-dev-mcp");
-        configured.env = vec![crate::EnvVar {
-            name: "BUZZ_RELAY_URL".into(),
-            value: "wss://x".into(),
-        }];
-        let out = mcp_servers_with_goose_shell(vec![test_mcp("harbor-legal")], &[configured]);
-        assert_eq!(
-            out.iter().map(|s| s.name.as_str()).collect::<Vec<_>>(),
-            ["harbor-legal", "buzz-dev-mcp"],
-        );
-        // env preserved from the configured server
-        assert_eq!(out[1].env.len(), 1);
-    }
-
-    #[test]
-    fn goose_shell_constructed_when_no_configured_default() {
-        // The common case: mcp_command empty → no default server → construct a
-        // minimal buzz-dev-mcp (bare command, no env — its shell needs neither).
-        let out = mcp_servers_with_goose_shell(vec![test_mcp("harbor-x")], &[]);
-        assert_eq!(
-            out.iter().map(|s| s.name.as_str()).collect::<Vec<_>>(),
-            ["harbor-x", "buzz-dev-mcp"],
-        );
-        let dev = out.iter().find(|s| s.name == "buzz-dev-mcp").unwrap();
-        assert_eq!(dev.command, "buzz-dev-mcp");
-        assert!(dev.args.is_empty() && dev.env.is_empty());
-    }
-
-    #[test]
-    fn goose_shell_not_doubled_when_room_already_lists_it() {
-        let out = mcp_servers_with_goose_shell(
-            vec![test_mcp("buzz-dev-mcp"), test_mcp("harbor-x")],
-            &[test_mcp("buzz-dev-mcp")],
-        );
-        assert_eq!(out.iter().filter(|s| s.name == "buzz-dev-mcp").count(), 1);
-        assert_eq!(out.len(), 2);
-    }
 
     // These pin the initial_message dispatch path (run_prompt_task, ~line 855):
     // a legacy agent WITH a base_prompt must get [Base] prepended to the user

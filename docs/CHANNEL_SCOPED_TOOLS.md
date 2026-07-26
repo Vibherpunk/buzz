@@ -65,13 +65,25 @@ supported harnesses react to that differently — by design:
   `config.yaml` extensions. Goose treats an explicit MCP server list as a full
   replacement of its tool set and **stops loading those extensions**. So scoping
   a channel intentionally overrides Goose's default toolset down to just the
-  channel's tools — that's the point (confine per channel) — but it means a
-  scoped Goose would otherwise lose its shell too. `buzz-acp` therefore re-adds a
-  baseline shell (`buzz-dev-mcp`) to any channel-scoped Goose session, so a scoped
-  Goose agent has **the room's tools + shell**, not its full local toolkit.
+  channel's tools — that's the point (confine per channel).
 
-To let a Goose agent keep its *full* local functionality in a channel, don't
-scope that channel — an unscoped channel keeps the harness's own default
+To keep every scoped agent — any harness — able to *execute*, declare an
+execution baseline in the policy:
+
+```toml
+baseline_mcp = ["buzz-dev-mcp"]     # appended to every scoped channel
+```
+
+Those commands are appended (deduped) to **every scoped channel**, harness-agnostic,
+so a scoped Goose agent has **the room's skills + the baseline** (e.g. shell via
+`buzz-dev-mcp`) instead of an empty toolbox. Confinement stays intact — the
+baseline is a bounded, explicit set, *not* the harness's whole config — and
+unscoped/persona-only channels get nothing. Claude gets the baseline too (a
+redundant shell — harmless). An agent that needs more than the baseline in a
+given channel gets those tools in its **room**, still scoped.
+
+To instead let a Goose agent keep its *full* local functionality in a channel,
+don't scope that channel — an unscoped channel keeps the harness's own default
 extensions untouched.
 
 **Skills vs personas — only tools scope the harness.** Skills live *inside* the
