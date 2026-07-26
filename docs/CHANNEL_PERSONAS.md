@@ -86,6 +86,11 @@ harbor room-persona <room> <name> --set-body T  # edit the canonical persona
   silently running the wrong persona is worse than the process refusing to start.
 - **Opt-in.** A channel with no persona (explicit or room-derived) behaves exactly
   as stock Buzz.
+- **Orthogonal to tools.** A persona is only the session's system prompt — it never
+  changes the channel's MCP servers. A channel with a persona but no room/tools
+  leaves the harness's own tools completely untouched (including a Goose agent's
+  full local `config.yaml`); only [channel-scoped *tools*](CHANNEL_SCOPED_TOOLS.md)
+  replace the harness's tool set.
 
 ## Not this: `harbor buzz-pack`
 
