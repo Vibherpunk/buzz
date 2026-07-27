@@ -13,6 +13,14 @@
   <a href="LICENSE">Apache 2.0</a>
 </p>
 
+> [!NOTE]
+> **This is a fork of [`block/buzz`](https://github.com/block/buzz).** The one thing
+> it adds is **channel-scoped tools**: map a channel to a [Harbor](https://github.com/TDH-Labs/Harbor)
+> room so every agent working there is confined to exactly that room's skills and MCP
+> tools — enforced server-side, managed from a **Channel tools** panel in the channel
+> header. Everything else is unmodified upstream Buzz.
+> **→ [What this fork adds](docs/CHANNEL_SCOPED_TOOLS.md)**
+
 <p align="center">
   <img src="docs/assets/screenshots/channel-thread.png" alt="A Buzz project channel where people and an agent coordinate on a release plan" width="100%">
 </p>
