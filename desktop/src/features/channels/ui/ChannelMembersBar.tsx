@@ -198,6 +198,23 @@ export function ChannelMembersBar({
         <Tooltip disableHoverableContent>
           <TooltipTrigger asChild>
             <Button
+              aria-label="Channel tools"
+              className="h-8 px-2.5"
+              data-testid="channel-tools-trigger"
+              onClick={() => setIsToolsOpen(true)}
+              type="button"
+              variant="outline"
+            >
+              <Blocks />
+              <span className="text-sm font-medium">Tools</span>
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Channel tools (skills &amp; MCP)</TooltipContent>
+        </Tooltip>
+
+        <Tooltip disableHoverableContent>
+          <TooltipTrigger asChild>
+            <Button
               aria-label="Manage channel"
               data-testid="channel-management-trigger"
               onClick={onManageChannel}
