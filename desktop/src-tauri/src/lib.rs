@@ -734,8 +734,6 @@ pub fn run() {
             get_channels,
             create_channel,
             ensure_starter_channels,
-<<<<<<< HEAD
-=======
             channel_tools_get,
             channel_tools_pool_skills,
             channel_tools_add_existing_skill,
@@ -743,7 +741,6 @@ pub fn run() {
             channel_tools_add_mcp,
             channel_tools_remove_skill,
             channel_tools_remove_mcp,
->>>>>>> 609515a75 (feat(desktop): remove skills & MCP servers from a channel)
             open_dm,
             hide_dm,
             get_channel_details,
