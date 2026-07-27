@@ -888,6 +888,9 @@ impl ChannelInfoResolver {
 
 pub struct PromptContext {
     pub mcp_servers: Vec<McpServer>,
+    /// Channel-scoped tool policy: channels with an entry replace
+    /// `mcp_servers` for sessions created on that channel.
+    pub channel_tools: crate::channel_tools::ChannelTools,
     pub initial_message: Option<String>,
     pub idle_timeout: Duration,
     pub max_turn_duration: Duration,
@@ -1576,6 +1579,7 @@ struct NewSessionChannelContext<'a> {
     name: Option<&'a str>,
     scope: Option<&'a SessionScope>,
     channel_type: Option<&'a str>,
+    channel_id: Option<&'a Uuid>,
 }
 
 async fn create_session_and_apply_model(
@@ -1622,6 +1626,26 @@ async fn create_session_and_apply_model(
         channel.channel_type,
         ctx.session_title.as_deref(),
     );
+
+    // Channel-scoped tools: a channel with a policy entry replaces the global
+    // MCP set for its session. The agent runtime skips its own configured
+    // extensions whenever explicit servers are passed, so a scoped channel
+    // exposes exactly the listed servers.
+    let mcp_servers = channel
+        .channel_id
+        .and_then(|cid| {
+            let name = ctx.channel_info.get(cid).map(|i| i.name.as_str());
+            ctx.channel_tools.resolve(cid, name).map(|servers| {
+                tracing::info!(
+                    channel = %cid,
+                    channel_name = name.unwrap_or("?"),
+                    servers = servers.len(),
+                    "channel-scoped tools applied to new session"
+                );
+                servers.clone()
+            })
+        })
+        .unwrap_or(mcp_servers);
 
     let resp = agent
         .acp
@@ -1881,6 +1905,7 @@ pub(crate) async fn run_isolated_prompt(
             name: None,
             scope: None,
             channel_type: None,
+                        channel_id: None,
         },
     )
     .await?;
@@ -2677,6 +2702,7 @@ pub async fn run_prompt_task(
                         name: title_channel.as_deref(),
                         scope: Some(scope),
                         channel_type: origin_channel_type.as_deref(),
+                        channel_id: Some(cid),
                     },
                 )
                 .await
@@ -2743,6 +2769,7 @@ pub async fn run_prompt_task(
                         name: None,
                         scope: None,
                         channel_type: None,
+                        channel_id: None,
                     },
                 )
                 .await
@@ -10421,6 +10448,7 @@ printf '%s\n' '{{"jsonrpc":"2.0","id":0,"result":{{"stopReason":"end_turn"}}}}'"
         use crate::relay::RestClient;
         PromptContext {
             mcp_servers: vec![],
+            channel_tools: Default::default(),
             initial_message: None,
             idle_timeout: Duration::from_secs(60),
             max_turn_duration: Duration::from_secs(120),
@@ -11545,6 +11573,7 @@ done"#
                 name: None,
                 scope: None,
                 channel_type: None,
+                        channel_id: None,
             },
         )
         .await
@@ -11582,6 +11611,7 @@ done"#
                 name: None,
                 scope: None,
                 channel_type: None,
+                        channel_id: None,
             },
         )
         .await
@@ -11616,6 +11646,7 @@ done"#
                 name: None,
                 scope: None,
                 channel_type: None,
+                        channel_id: None,
             },
         )
         .await
@@ -11649,6 +11680,7 @@ done"#
                 name: None,
                 scope: None,
                 channel_type: None,
+                        channel_id: None,
             },
         )
         .await
@@ -11689,6 +11721,7 @@ exit 0"#
                 name: None,
                 scope: None,
                 channel_type: None,
+                        channel_id: None,
             },
         )
         .await
@@ -11970,6 +12003,7 @@ done"#
                 name: None,
                 scope: None,
                 channel_type: None,
+                        channel_id: None,
             },
         )
         .await
@@ -12041,6 +12075,7 @@ done"#
                 name: None,
                 scope: None,
                 channel_type: None,
+                        channel_id: None,
             },
         )
         .await
@@ -12096,6 +12131,7 @@ done"#
                 name: None,
                 scope: None,
                 channel_type: None,
+                        channel_id: None,
             },
         )
         .await
@@ -12138,6 +12174,7 @@ done"#
                 name: None,
                 scope: None,
                 channel_type: None,
+                        channel_id: None,
             },
         )
         .await
@@ -12179,6 +12216,7 @@ done"#
                 name: None,
                 scope: None,
                 channel_type: None,
+                        channel_id: None,
             },
         )
         .await
@@ -12245,6 +12283,7 @@ done"#
                 name: None,
                 scope: None,
                 channel_type: None,
+                        channel_id: None,
             },
         )
         .await
@@ -12282,6 +12321,7 @@ done"#
                 name: None,
                 scope: None,
                 channel_type: None,
+                        channel_id: None,
             },
         )
         .await
@@ -12355,6 +12395,7 @@ done"#
                 name: None,
                 scope: None,
                 channel_type: None,
+                        channel_id: None,
             },
         )
         .await
@@ -12396,6 +12437,7 @@ done"#
                 name: None,
                 scope: None,
                 channel_type: None,
+                        channel_id: None,
             },
         )
         .await

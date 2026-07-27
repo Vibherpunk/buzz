@@ -5,6 +5,7 @@ mod git;
 mod git_runtime_tests;
 
 mod acp;
+mod channel_tools;
 mod config;
 mod edit_routing;
 mod engram_fetch;
@@ -9518,6 +9519,7 @@ mod build_mcp_servers_tests {
             channels_override: None,
             no_mention_filter: false,
             config_path: std::path::PathBuf::from("./buzz-acp.toml"),
+            channel_tools_path: None,
             context_message_limit: 12,
             max_turns_per_session: 0,
             presence_enabled: true,
@@ -9949,6 +9951,7 @@ mod error_outcome_emission_tests {
             channels_override: None,
             no_mention_filter: false,
             config_path: std::path::PathBuf::from("./buzz-acp.toml"),
+            channel_tools_path: None,
             context_message_limit: 12,
             max_turns_per_session: 0,
             presence_enabled: true,

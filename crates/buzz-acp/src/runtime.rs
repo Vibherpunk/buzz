@@ -82,8 +82,24 @@ fn make_prompt_context(
 ) -> Result<PromptContext> {
     let base_prompt_content = config.base_prompt_content.as_ref();
     let cwd = current_working_directory()?;
+    // Channel-scoped tool policy: parse failures are fatal by design — a tool
+    // policy must never silently degrade to "no scoping".
+    let channel_tools = match config.channel_tools_path.as_deref() {
+        Some(path) => {
+            let tools = crate::channel_tools::ChannelTools::load(path)
+                .map_err(|e| anyhow::anyhow!("channel-tools policy: {e}"))?;
+            tracing::info!(
+                policy = %path.display(),
+                entries = tools.entry_count(),
+                "channel-scoped tool policy loaded"
+            );
+            tools
+        }
+        None => Default::default(),
+    };
     Ok(PromptContext {
         mcp_servers: build_mcp_servers(config),
+        channel_tools,
         initial_message: config.initial_message.clone(),
         idle_timeout: Duration::from_secs(config.idle_timeout_secs),
         max_turn_duration: Duration::from_secs(config.max_turn_duration_secs),
