@@ -16,8 +16,8 @@ responds there — now or later — is confined to exactly that toolset, enforce
 server-side and audited. Nothing leaks in from the harness; nothing leaks across
 channels.
 
-A `#legal` channel exposes the legal room's skills; a `#bookkeeping` channel
-exposes the bookkeeping room's; an agent moving between them picks up each
+A `#legal` channel exposes the legal room's skills; a `#billing` channel
+exposes the billing room's; an agent moving between them picks up each
 channel's tools as it goes. Multiple agents in one channel all share that
 channel's scope.
 
@@ -32,8 +32,8 @@ harbor_command = "harbor"           # binary used for `room` entries
 [channels.legal]
 room = "legal"                      # → expands to: harbor mcp-server --room=legal
 
-[channels.bookkeeping]
-room = "bookkeeping"
+[channels.billing]
+room = "billing"
 ```
 
 When `buzz-acp` creates a session for a channel, it looks the channel up in that
@@ -52,6 +52,35 @@ and none can load a skill from another room.
 Because scoping happens where the agent *runs* (your machine's `buzz-acp` reading
 your local policy), it applies in **any** community the agent works in —
 self-hosted or Block-hosted. The relay only moves messages.
+
+## Harnesses: scoping replaces the tool set (which affects Goose specifically)
+
+The override is a full **replace** of the session's MCP servers, and the two
+supported harnesses react to that differently — by design:
+
+- **Claude** — its shell and file tools are built-in *agent* capabilities, not
+  MCP servers, so the server list can't take them away. A scoped Claude agent
+  keeps its built-in shell and gets the channel's tools on top.
+- **Goose** — its shell (and its other tools) come from its own local
+  `config.yaml` extensions. Goose treats an explicit MCP server list as a full
+  replacement of its tool set and **stops loading those extensions**. So scoping
+  a channel intentionally overrides Goose's default toolset down to just the
+  channel's tools — that's the point (confine per channel) — but it means a
+  scoped Goose would otherwise lose its shell too. `buzz-acp` therefore re-adds a
+  baseline shell (`buzz-dev-mcp`) to any channel-scoped Goose session, so a scoped
+  Goose agent has **the room's tools + shell**, not its full local toolkit.
+
+To let a Goose agent keep its *full* local functionality in a channel, don't
+scope that channel — an unscoped channel keeps the harness's own default
+extensions untouched.
+
+**Skills vs personas — only tools scope the harness.** Skills live *inside* the
+room's MCP server, so they're part of the scoped tool set: having a room (to have
+skills) is what triggers the override. **Personas do not affect tools at all** —
+a persona is only the session's system prompt, resolved on a separate path, so a
+channel with a persona but no room/tools leaves the harness's tools completely
+untouched (Goose keeps its full `config.yaml`). See
+[Channel personas](CHANNEL_PERSONAS.md).
 
 ## What changed vs. upstream
 
