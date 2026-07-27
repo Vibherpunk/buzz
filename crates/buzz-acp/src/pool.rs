@@ -818,6 +818,39 @@ async fn create_session_and_apply_model(
     // its own `[Agent Memory — core]` header, and canvas carries its own
     // `[Channel Canvas]` header; both are appended with a blank-line separator.
     let is_goose = agent.agent_name == "goose";
+<<<<<<< HEAD
+=======
+
+    // Block's `ChannelInfoResolver::resolve` is async and returns an owned
+    // `PromptChannelInfo` (cache-first, then REST). Resolve the channel's display
+    // name once here — outside the sync closures below, which can't `.await` — and
+    // share it across both the persona and tool hooks so we fetch at most once.
+    let resolved_channel = match channel_id {
+        Some(cid) => ctx.channel_info.resolve(*cid).await,
+        None => None,
+    };
+    let channel_name = resolved_channel.as_ref().map(|i| i.name.as_str());
+
+    // Channel-scoped persona: a channel with a `persona`/`persona_file` entry
+    // REPLACES the agent's base `system_prompt` for sessions created there —
+    // never layered, appended, or merged. No entry keeps the base prompt. Same
+    // per-channel resolution (UUID first, then name) as tool-scoping, applied in
+    // this local so concurrent sessions on one process never cross prompts.
+    let effective_system_prompt = channel_id
+        .and_then(|cid| {
+            ctx.channel_tools
+                .resolve_persona(cid, channel_name)
+                .inspect(|_persona| {
+                    tracing::info!(
+                        channel = %cid,
+                        channel_name = channel_name.unwrap_or("?"),
+                        "channel-scoped persona applied to new session"
+                    );
+                })
+        })
+        .or(ctx.system_prompt.as_deref());
+
+>>>>>>> a1a719cb0 (fix(buzz-acp): adapt channel-scoped hooks to Block's async ChannelInfoResolver)
     let combined_system_prompt = with_canvas(
         with_core(
             with_team(
@@ -835,11 +868,10 @@ async fn create_session_and_apply_model(
     // exposes exactly the listed servers.
     let mcp_servers = channel_id
         .and_then(|cid| {
-            let name = ctx.channel_info.get(cid).map(|i| i.name.as_str());
-            ctx.channel_tools.resolve(cid, name).map(|servers| {
+            ctx.channel_tools.resolve(cid, channel_name).map(|servers| {
                 tracing::info!(
                     channel = %cid,
-                    channel_name = name.unwrap_or("?"),
+                    channel_name = channel_name.unwrap_or("?"),
                     servers = servers.len(),
                     "channel-scoped tools applied to new session"
                 );
