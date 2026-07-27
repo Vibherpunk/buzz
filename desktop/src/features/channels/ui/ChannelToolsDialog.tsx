@@ -6,6 +6,7 @@ import {
   Plug,
   Puzzle,
   Search,
+  X,
 } from "lucide-react";
 import * as React from "react";
 
@@ -15,6 +16,8 @@ import {
   addNewSkillToChannel,
   getChannelTools,
   getPoolSkills,
+  removeMcpFromChannel,
+  removeSkillFromChannel,
   type ChannelTools,
   type PoolSkill,
 } from "@/shared/api/tauriChannelTools";
@@ -93,8 +96,26 @@ function ChannelToolsBody({
   channelKey: string;
   tools: ChannelTools;
 }) {
+  const queryClient = useQueryClient();
+  const invalidate = () =>
+    queryClient.invalidateQueries({ queryKey: channelToolsKey(channelKey) });
+
+  const removeSkill = useMutation({
+    mutationFn: (skill: string) => removeSkillFromChannel(channelKey, skill),
+    onSuccess: invalidate,
+  });
+  const removeMcp = useMutation({
+    mutationFn: (name: string) => removeMcpFromChannel(channelKey, name),
+    onSuccess: invalidate,
+  });
+  const removeError =
+    (removeSkill.error instanceof Error && removeSkill.error.message) ||
+    (removeMcp.error instanceof Error && removeMcp.error.message) ||
+    null;
+
   return (
     <div className="flex max-h-[60vh] flex-col gap-5 overflow-y-auto pr-1">
+      {removeError ? <ErrorNote message={removeError} /> : null}
       <section className="flex flex-col gap-2">
         <SectionHeading
           icon={<Puzzle className="h-4 w-4" />}
@@ -130,6 +151,14 @@ function ChannelToolsBody({
                     </p>
                   ) : null}
                 </div>
+                <RemoveButton
+                  label={`Remove ${skill.name}`}
+                  pending={
+                    removeSkill.isPending &&
+                    removeSkill.variables === skill.name
+                  }
+                  onClick={() => removeSkill.mutate(skill.name)}
+                />
               </li>
             ))}
           </ul>
@@ -155,6 +184,13 @@ function ChannelToolsBody({
                 <span className="truncate text-sm font-medium">
                   {server.name}
                 </span>
+                <RemoveButton
+                  label={`Remove ${server.name}`}
+                  pending={
+                    removeMcp.isPending && removeMcp.variables === server.name
+                  }
+                  onClick={() => removeMcp.mutate(server.name)}
+                />
               </li>
             ))}
           </ul>
@@ -438,6 +474,33 @@ function AddMcpControls({ channelKey }: { channelKey: string }) {
         </Button>
       </div>
     </div>
+  );
+}
+
+function RemoveButton({
+  label,
+  pending,
+  onClick,
+}: {
+  label: string;
+  pending: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      aria-label={label}
+      className="shrink-0 rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive disabled:opacity-50"
+      disabled={pending}
+      onClick={onClick}
+      title={label}
+      type="button"
+    >
+      {pending ? (
+        <Loader2 className="h-4 w-4 animate-spin" />
+      ) : (
+        <X className="h-4 w-4" />
+      )}
+    </button>
   );
 }
 
