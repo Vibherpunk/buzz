@@ -1,4 +1,4 @@
-import { EllipsisVertical, Settings2, Users } from "lucide-react";
+import { Blocks, EllipsisVertical, Settings2, Users } from "lucide-react";
 import * as React from "react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
@@ -25,6 +25,7 @@ import {
   DropdownMenuTrigger,
 } from "@/shared/ui/dropdown-menu";
 import { AddChannelBotDialog } from "./AddChannelBotDialog";
+import { ChannelToolsDialog } from "./ChannelToolsDialog";
 
 type ChannelMembersBarProps = {
   channel: Channel;
@@ -57,6 +58,7 @@ export function ChannelMembersBar({
     },
     [isAddBotOpenProp, onAddBotOpenChange],
   );
+  const [isToolsOpen, setIsToolsOpen] = React.useState(false);
   const { startHuddle, isStarting: isStartingHuddle } = useHuddle();
   const queryClient = useQueryClient();
   const membersQuery = useChannelMembersQuery(channel.id);
@@ -164,6 +166,13 @@ export function ChannelMembersBar({
           </DropdownMenuItem>
           {huddleIndicator}
           <DropdownMenuItem
+            data-testid="channel-tools-trigger"
+            onSelect={() => setIsToolsOpen(true)}
+          >
+            <Blocks />
+            <span>Channel tools</span>
+          </DropdownMenuItem>
+          <DropdownMenuItem
             data-testid="channel-management-trigger"
             onSelect={onManageChannel}
           >
@@ -247,6 +256,13 @@ export function ChannelMembersBar({
         providers={providers}
         providersErrorMessage={dialogErrorMessage}
         providersLoading={providersQuery.isLoading}
+      />
+
+      <ChannelToolsDialog
+        channelKey={channel.name || channel.id}
+        channelTitle={channel.name || "this channel"}
+        onOpenChange={setIsToolsOpen}
+        open={isToolsOpen}
       />
     </React.Fragment>
   );

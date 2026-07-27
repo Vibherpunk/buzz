@@ -849,6 +849,14 @@ async fn create_session_and_apply_model(
     // its own `[Agent Memory — core]` header, and canvas carries its own
     // `[Channel Canvas]` header; both are appended with a blank-line separator.
     let is_goose = agent.agent_name == "goose";
+
+    // Resolve channel display name for logging (channel-tools scoping).
+    let resolved_channel = match channel_id {
+        Some(cid) => ctx.channel_info.resolve(*cid).await,
+        None => None,
+    };
+    let channel_name = resolved_channel.as_ref().map(|i| i.name.as_str());
+
     let combined_system_prompt = with_canvas(
         with_core(
             with_team(
