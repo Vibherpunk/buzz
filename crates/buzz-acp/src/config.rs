@@ -341,6 +341,12 @@ pub struct CliArgs {
     #[arg(long, env = "BUZZ_ACP_CONFIG", default_value = "./buzz-acp.toml")]
     pub config: PathBuf,
 
+    /// Channel-scoped tool policy file (TOML). Maps channels (by UUID or name)
+    /// to the MCP servers exposed to sessions on that channel; see
+    /// `channel_tools.rs` for the format. Unset = no per-channel scoping.
+    #[arg(long, env = "BUZZ_ACP_CHANNEL_TOOLS")]
+    pub channel_tools: Option<PathBuf>,
+
     #[arg(long, env = "BUZZ_ACP_DEDUP", default_value = "queue", value_enum)]
     pub dedup: DedupMode,
 
@@ -510,6 +516,8 @@ pub struct Config {
     pub channels_override: Option<Vec<String>>,
     pub no_mention_filter: bool,
     pub config_path: PathBuf,
+    /// Channel-scoped tool policy file; see `channel_tools.rs`.
+    pub channel_tools_path: Option<PathBuf>,
     pub context_message_limit: u32,
     /// Maximum turns per session before proactive rotation. 0 = disabled.
     pub max_turns_per_session: u32,
@@ -986,6 +994,7 @@ impl Config {
             channels_override: args.channels,
             no_mention_filter: args.no_mention_filter,
             config_path: args.config,
+            channel_tools_path: args.channel_tools,
             context_message_limit: args.context_message_limit,
             max_turns_per_session: args.max_turns_per_session,
             presence_enabled: !args.no_presence,
@@ -1355,6 +1364,7 @@ mod tests {
             channels_override: None,
             no_mention_filter: false,
             config_path: PathBuf::from("./buzz-acp.toml"),
+            channel_tools_path: None,
             context_message_limit: 12,
             max_turns_per_session: 0,
             presence_enabled: true,
