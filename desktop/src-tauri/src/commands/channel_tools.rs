@@ -150,6 +150,59 @@ async fn ensure_channel_room(channel: &str) -> Result<String, String> {
         .ok_or_else(|| "could not scope this channel".to_string())
 }
 
+/// Resolve the room backing an already-scoped channel WITHOUT creating one
+/// (read-only — used by the remove path, where scoping on the fly would be
+/// wrong). Errors if the channel isn't scoped.
+async fn channel_room(channel: &str) -> Result<String, String> {
+    let out = run_harbor(vec![
+        "channel-tools".into(),
+        channel.to_string(),
+        "--json".into(),
+    ])
+    .await?;
+    let value = json_output(out)?;
+    value
+        .get("room")
+        .and_then(|r| r.as_str())
+        .map(|s| s.to_string())
+        .ok_or_else(|| "this channel has no tools to remove".to_string())
+}
+
+/// Remove a skill from this channel (unregister it from the channel's room).
+#[tauri::command]
+pub async fn channel_tools_remove_skill(channel: String, skill: String) -> Result<String, String> {
+    let channel = safe_arg("channel", &channel)?;
+    let skill = safe_arg("skill", &skill)?;
+    let room = channel_room(&channel).await?;
+    let out = run_harbor(vec![
+        "skill-remove".into(),
+        "--name".into(),
+        skill,
+        "--room".into(),
+        room,
+        "--yes".into(),
+    ])
+    .await?;
+    text_output(out)
+}
+
+/// Remove an MCP server from this channel.
+#[tauri::command]
+pub async fn channel_tools_remove_mcp(channel: String, name: String) -> Result<String, String> {
+    let channel = safe_arg("channel", &channel)?;
+    let name = safe_arg("name", &name)?;
+    let room = channel_room(&channel).await?;
+    let out = run_harbor(vec![
+        "mcp-remove".into(),
+        "--room".into(),
+        room,
+        "--name".into(),
+        name,
+    ])
+    .await?;
+    text_output(out)
+}
+
 /// Add an existing skill (from elsewhere in Buzz) to this channel. Scopes the
 /// channel on the fly if it isn't already.
 #[tauri::command]

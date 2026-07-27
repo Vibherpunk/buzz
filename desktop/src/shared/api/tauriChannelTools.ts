@@ -76,6 +76,22 @@ export function addNewSkillToChannel(
   });
 }
 
+/** Remove a skill from this channel (unregister it from the channel's room). */
+export function removeSkillFromChannel(
+  channel: string,
+  skill: string,
+): Promise<string> {
+  return invokeTauri<string>("channel_tools_remove_skill", { channel, skill });
+}
+
+/** Remove an MCP server from this channel. */
+export function removeMcpFromChannel(
+  channel: string,
+  name: string,
+): Promise<string> {
+  return invokeTauri<string>("channel_tools_remove_mcp", { channel, name });
+}
+
 /** Add an MCP server to this channel. Scopes it on the fly. */
 export function addMcpToChannel(
   channel: string,
