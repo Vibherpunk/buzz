@@ -892,7 +892,6 @@ async fn resolve_new_session_channel_context(
     let title_channel = (!is_dm && info.name != UNKNOWN_CHANNEL_NAME).then_some(info.name);
     (is_dm, title_channel)
 }
-}
 
 /// Create a new ACP session via `session_new_full()`, populate model capabilities
 /// on the agent (first session only), and apply `desired_model` if set.
@@ -932,14 +931,17 @@ async fn create_session_and_apply_model(
     // MCP set for its session. The agent runtime skips its own configured
     // extensions whenever explicit servers are passed, so a scoped channel
     // exposes exactly the listed servers.
-    let scoped_mcp = ctx.channel_tools.resolve(&Uuid::nil(), channel_name).map(|servers| {
-        tracing::info!(
-            channel_name = channel_name.unwrap_or("?"),
-            servers = servers.len(),
-            "channel-scoped tools applied to new session"
-        );
-        servers.clone()
-    });
+    let scoped_mcp = ctx
+        .channel_tools
+        .resolve(&Uuid::nil(), channel_name)
+        .map(|servers| {
+            tracing::info!(
+                channel_name = channel_name.unwrap_or("?"),
+                servers = servers.len(),
+                "channel-scoped tools applied to new session"
+            );
+            servers.clone()
+        });
     // Goose REPLACES (not augments) its tool set when handed an explicit MCP
     // server list, so it stops loading its own local extensions — including the
     // one that provides shell. channel-tools scoping always passes an explicit
