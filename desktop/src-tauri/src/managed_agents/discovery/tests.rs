@@ -5,10 +5,10 @@ use super::{
     apply_agent_command_update, classify_runtime, codex_adapter_availability,
     codex_adapter_is_outdated, create_time_agent_command_override, default_agent_command,
     effective_agent_command, find_nvm_default_bin, find_via_login_shell,
-    is_login_shell_path_uninit, is_safe_nvm_tag, managed_agent_avatar_url, normalize_agent_args,
-    parse_semver_tag, probe_codex_acp_version, record_agent_command, refresh_login_shell_path,
-    try_record_agent_command, BUZZ_AGENT_AVATAR_URL, CLAUDE_CODE_AVATAR_URL, CODEX_AVATAR_URL,
-    GOOSE_AVATAR_URL,
+    is_login_shell_path_uninit, is_safe_nvm_tag, known_acp_runtime, known_acp_runtime_exact,
+    managed_agent_avatar_url, normalize_agent_args, parse_semver_tag, probe_codex_acp_version,
+    record_agent_command, refresh_login_shell_path, try_record_agent_command,
+    BUZZ_AGENT_AVATAR_URL, CLAUDE_CODE_AVATAR_URL, CODEX_AVATAR_URL, GOOSE_AVATAR_URL,
 };
 use crate::managed_agents::AcpAvailabilityStatus;
 
@@ -1836,4 +1836,27 @@ fn discovery_publish_path_drops_mid_flight_delete() {
         lookup_loaded_harness_by_id("mid-flight-delete").is_none(),
         "discovery's publish must not resurrect a harness deleted mid-discovery"
     );
+}
+
+#[test]
+fn interpreter_resolves_as_known_acp_runtime() {
+    // Command lookup (used by model discovery / config bridge dispatch) must
+    // resolve "interpreter" to the KnownAcpRuntime entry.
+    let by_command = known_acp_runtime("interpreter").expect("interpreter command should resolve");
+    assert_eq!(by_command.id, "interpreter");
+
+    // Exact-id lookup (used elsewhere, e.g. record resolution) must too.
+    let by_id = known_acp_runtime_exact("interpreter").expect("interpreter id should resolve");
+    assert_eq!(by_id.id, "interpreter");
+
+    // The dispatch key that connects the config bridge to discovery:
+    // provider/model env vars + TOML config path.
+    assert_eq!(by_id.provider_env_var, Some("CODEX_MODEL_PROVIDER"));
+    assert_eq!(by_id.model_env_var, Some("CODEX_MODEL"));
+    assert_eq!(
+        by_id.config_file_path,
+        Some("~/.openinterpreter/config.toml")
+    );
+    assert_eq!(by_id.config_file_format, Some("toml"));
+    assert_eq!(by_id.underlying_cli, Some("interpreter"));
 }

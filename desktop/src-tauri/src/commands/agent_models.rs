@@ -350,7 +350,7 @@ fn is_openai_compatible_provider(provider: Option<&str>) -> bool {
             .map(str::trim)
             .map(str::to_ascii_lowercase)
             .as_deref(),
-        Some("openai" | "openai-compat")
+        Some("openai" | "openai-compat" | "ollama" | "nvidia")
     )
 }
 
@@ -498,16 +498,41 @@ async fn discover_openai_compatible_models(
     let api_key = if relay_mesh {
         crate::managed_agents::RELAY_MESH_API_KEY_PLACEHOLDER.to_string()
     } else {
-        match provider.required_env(env, "OPENAI_COMPAT_API_KEY")? {
-            Some(api_key) => api_key,
-            None => return Ok(None),
+        let provider_id = provider
+            .as_deref()
+            .map(str::trim)
+            .map(str::to_ascii_lowercase);
+        match provider_id.as_deref() {
+            Some("ollama") => String::new(),
+            Some("nvidia") => match provider.required_env(env, "NVIDIA_API_KEY")? {
+                Some(k) => k,
+                None => {
+                    return Ok(None);
+                }
+            },
+            _ => match provider.required_env(env, "OPENAI_COMPAT_API_KEY")? {
+                Some(api_key) => api_key,
+                None => return Ok(None),
+            },
         }
     };
     let redaction_env = redaction_env_with_value(env, "OPENAI_COMPAT_API_KEY", &api_key);
     let url = if relay_mesh {
         format!("{}/models", crate::managed_agents::RELAY_MESH_API_BASE_URL)
     } else {
-        openai_compatible_models_url_for_discovery(env)
+        let provider_id = provider
+            .as_deref()
+            .map(str::trim)
+            .map(str::to_ascii_lowercase);
+        match provider_id.as_deref() {
+            Some("ollama") => {
+                let base = env_or_process_value(env, "OLLAMA_HOST")
+                    .unwrap_or_else(|| "http://localhost:11434".to_string());
+                format!("{}/v1/models", base.trim_end_matches('/'))
+            }
+            Some("nvidia") => "https://integrate.api.nvidia.com/v1/models".to_string(),
+            _ => openai_compatible_models_url_for_discovery(env),
+        }
     };
     let response = client
         .get(&url)

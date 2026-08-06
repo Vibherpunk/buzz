@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="128" fill="#4764FF"/>
+  <g fill="white" transform="translate(256,256)">
+    <!-- Terminal bracket open -->
+    <path d="M-100,-60 L-60,-100 L-60,-80 L-90,-50 L-60,-20 L-60,0 L-100,-40 Z"/>
+    <!-- Terminal bracket close -->
+    <path d="M100,-60 L60,-100 L60,-80 L90,-50 L60,-20 L60,0 L100,-40 Z"/>
+    <!-- Underscore cursor line -->
+    <rect x="-50" y="40" width="100" height="12" rx="4"/>
+    <!-- Prompt >> symbol -->
+    <text x="-70" y="15" font-family="monospace" font-size="40" font-weight="bold" fill="white">&gt;&gt;</text>
+  </g>
+</svg>

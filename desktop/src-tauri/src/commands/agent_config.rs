@@ -5,7 +5,7 @@ use crate::{
     app_state::AppState,
     managed_agents::{
         config_bridge::{
-            read_goose_file_config,
+            read_goose_file_config, read_interpreter_file_config,
             reader::read_config_surface,
             types::{
                 AcpConfigOptionEntry, AcpConfigOptionValue, AcpModelEntry, InheritedConfigTiers,
@@ -147,7 +147,7 @@ fn resolve_config_surface(
 /// "Set in goose config" instead of surfacing a false required-field marker.
 ///
 /// Returns `null` when the runtime has no config file or it cannot be parsed.
-/// Currently only "goose" is supported; other runtimes return `null`.
+/// Supports "goose" and "interpreter"; other runtimes return `null`.
 #[tauri::command]
 pub async fn get_runtime_file_config(
     runtime_id: String,
@@ -155,6 +155,20 @@ pub async fn get_runtime_file_config(
     tokio::task::spawn_blocking(move || match runtime_id.as_str() {
         "goose" => {
             let cfg = read_goose_file_config()?;
+            let satisfied_env_keys = cfg
+                .extra
+                .into_iter()
+                .filter(|(_, v)| !v.is_empty())
+                .map(|(k, _)| k)
+                .collect();
+            Some(RuntimeFileConfigSubset {
+                provider: cfg.provider,
+                model: cfg.model,
+                satisfied_env_keys,
+            })
+        }
+        "interpreter" => {
+            let cfg = read_interpreter_file_config()?;
             let satisfied_env_keys = cfg
                 .extra
                 .into_iter()

@@ -2,6 +2,7 @@ mod buzz_agent;
 mod claude;
 mod codex;
 mod goose;
+mod interpreter;
 pub(crate) mod reader;
 mod schema_walker;
 pub(crate) mod types;
@@ -15,4 +16,11 @@ pub(crate) use types::*;
 /// so env vars we would otherwise require are not needed from Buzz.
 pub(crate) fn read_goose_file_config() -> Option<RuntimeFileConfig> {
     goose::read_config_file()
+}
+// Read the Open Interpreter harness config file (`~/.openinterpreter/config.toml`).
+///
+/// Used by readiness/agent-config to silence requirements that are already
+/// satisfied in the file config layer — mirrors the goose bridge.
+pub(crate) fn read_interpreter_file_config() -> Option<RuntimeFileConfig> {
+    interpreter::read_config_file()
 }

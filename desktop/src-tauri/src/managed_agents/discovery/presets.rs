@@ -178,6 +178,15 @@ pub(super) const PRESET_HARNESSES: &[PresetHarness] = &[
             Gateway's own environment separately.",
         underlying_cli: None,
     },
+    PresetHarness {
+        id: "interpreter",
+        label: "Interpreter",
+        command: "interpreter",
+        args: &["acp"],
+        install_instructions_url: "https://www.openinterpreter.com/",
+        install_hint: "The open-source coding agent that runs on your machine. Install it with: pip install open-interpreter",
+        underlying_cli: None,
+    },
 ];
 
 /// Return preset definitions for the spawn/readiness registry.

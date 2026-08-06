@@ -49,6 +49,8 @@ const KNOWN_LLM_PROVIDER_IDS = [
   "openai",
   "openai-compat",
   "openrouter",
+  "ollama",
+  "nvidia",
 ] as const;
 
 type PersonaLlmProviderId = (typeof KNOWN_LLM_PROVIDER_IDS)[number];
@@ -147,6 +149,8 @@ export const PERSONA_LLM_PROVIDER_OPTIONS: readonly PersonaModelOption[] = [
   { id: "openai", label: "OpenAI" },
   { id: "openai-compat", label: "OpenAI-compatible" },
   { id: "openrouter", label: "OpenRouter" },
+  { id: "ollama", label: "Ollama (Local)" },
+  { id: "nvidia", label: "NVIDIA" },
   { id: "relay-mesh", label: "Buzz shared compute" },
   { id: "databricks", label: "Databricks" },
   { id: "databricks_v2", label: "Databricks v2" },
@@ -160,6 +164,7 @@ const PERSONA_MODEL_OPTIONS_BY_RUNTIME: Record<
   "buzz-agent": [DEFAULT_MODEL_OPTION],
   claude: [DEFAULT_MODEL_OPTION],
   codex: [DEFAULT_MODEL_OPTION],
+  interpreter: [DEFAULT_MODEL_OPTION],
 };
 
 export function getRuntimePersonaModelOptions(
@@ -186,7 +191,11 @@ export function requiredCredentialEnvKeys(
   provider: string,
 ): readonly string[] {
   const normalizedRuntime = runtimeId.trim();
-  if (normalizedRuntime !== "buzz-agent" && normalizedRuntime !== "goose") {
+  if (
+    normalizedRuntime !== "buzz-agent" &&
+    normalizedRuntime !== "goose" &&
+    normalizedRuntime !== "interpreter"
+  ) {
     return [];
   }
   const config = PROVIDER_CREDENTIAL_CONFIG[provider.trim().toLowerCase()];
@@ -201,7 +210,12 @@ export function isMissingRequiredDropdownField(
 }
 
 export function runtimeSupportsLlmProviderSelection(runtimeId: string) {
-  return runtimeId === "buzz-agent" || runtimeId === "goose";
+  return (
+    runtimeId === "buzz-agent" ||
+    runtimeId === "goose" ||
+    runtimeId === "interpreter" ||
+    runtimeId === "codex"
+  );
 }
 
 /** Clears values whose meaning or support changes with the selected harness. */
@@ -307,7 +321,9 @@ export function providerRequiresExplicitModel(
     trimmedProvider === "anthropic" ||
     trimmedProvider === "openai" ||
     trimmedProvider === "openai-compat" ||
-    trimmedProvider === "openrouter"
+    trimmedProvider === "openrouter" ||
+    trimmedProvider === "ollama" ||
+    trimmedProvider === "nvidia"
   );
 }
 
