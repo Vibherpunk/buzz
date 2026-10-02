@@ -1595,8 +1595,6 @@ async fn create_session_and_apply_model(
     // its own `<core-memory>` boundary, and canvas carries its own
     // `<channel-canvas>` boundary; both are appended with a blank-line separator.
     let is_goose = agent.agent_name == "goose";
-<<<<<<< HEAD
-=======
 
     // Block's `ChannelInfoResolver::resolve` is async and returns an owned
     // `PromptChannelInfo` (cache-first, then REST). Resolve the channel's display
@@ -1627,7 +1625,6 @@ async fn create_session_and_apply_model(
         })
         .or(ctx.system_prompt.as_deref());
 
->>>>>>> a1a719cb0 (fix(buzz-acp): adapt channel-scoped hooks to Block's async ChannelInfoResolver)
     let combined_system_prompt = with_canvas(
         with_huddle_instructions(
             with_core(
@@ -1664,20 +1661,37 @@ async fn create_session_and_apply_model(
     // MCP set for its session. The agent runtime skips its own configured
     // extensions whenever explicit servers are passed, so a scoped channel
     // exposes exactly the listed servers.
-    let mcp_servers = channel
-        .channel_id
-        .and_then(|cid| {
-            ctx.channel_tools.resolve(cid, channel_name).map(|servers| {
-                tracing::info!(
-                    channel = %cid,
-                    channel_name = channel_name.unwrap_or("?"),
-                    servers = servers.len(),
-                    "channel-scoped tools applied to new session"
-                );
-                servers.clone()
-            })
+    let scoped_mcp = channel.channel_id.and_then(|cid| {
+        ctx.channel_tools.resolve(cid, channel_name).map(|servers| {
+            tracing::info!(
+                channel = %cid,
+                channel_name = channel_name.unwrap_or("?"),
+                servers = servers.len(),
+                "channel-scoped tools applied to new session"
+            );
+            servers.clone()
         })
-        .unwrap_or(mcp_servers);
+    });
+    // Goose REPLACES (not augments) its tool set when handed an explicit MCP
+    // server list, so it stops loading its own local extensions — including the
+    // one that provides shell. channel-tools scoping always passes an explicit
+    // list, which would leave a scoped Goose agent with the room's skills but no
+    // way to run anything. So for Goose specifically, re-add the default dev-mcp
+    // server(s) (which expose shell) whenever scoping applies. Claude's shell is a
+    // built-in capability, unaffected by the server list, so this never runs for it.
+    let channel_scoped = scoped_mcp.is_some();
+    let mut mcp_servers = scoped_mcp.unwrap_or(mcp_servers);
+    if is_goose && channel_scoped {
+        let before = mcp_servers.len();
+        mcp_servers = mcp_servers_with_goose_shell(mcp_servers, &ctx.mcp_servers);
+        if mcp_servers.len() != before {
+            tracing::info!(
+                channel_name = channel_name.unwrap_or("?"),
+                added = mcp_servers.len() - before,
+                "re-added dev-mcp shell server(s) for scoped Goose session"
+            );
+        }
+    }
 
     let resp = agent
         .acp
@@ -1961,6 +1975,37 @@ pub(crate) async fn run_isolated_prompt(
         .acp
         .session_prompt_with_idle_timeout(&session_id, &prompt, ctx.idle_timeout, max_duration)
         .await
+}
+
+/// Ensure a channel-scoped Goose server list includes `buzz-dev-mcp` (which
+/// exposes shell). Goose replaces its whole tool set with an explicit list
+/// (dropping its own shell extension); channel-tools scoping always passes one,
+/// so a scoped Goose agent would otherwise have skills but no execution.
+///
+/// If the agent already has a configured `buzz-dev-mcp` default server (rare —
+/// only when `mcp_command` is set), reuse it so its env carries over; otherwise
+/// construct a minimal one. `buzz-dev-mcp` is a bundled sidecar resolved by bare
+/// name via the augmented PATH the desktop app gives the agent process, and its
+/// shell tool needs no args and no startup env. Deduped so a room that already
+/// lists it isn't doubled. Only called for Goose — Claude's shell is built-in.
+fn mcp_servers_with_goose_shell(
+    mut scoped: Vec<McpServer>,
+    default_servers: &[McpServer],
+) -> Vec<McpServer> {
+    const DEV_MCP: &str = "buzz-dev-mcp";
+    if scoped.iter().any(|s| s.name == DEV_MCP) {
+        return scoped;
+    }
+    match default_servers.iter().find(|s| s.name == DEV_MCP) {
+        Some(configured) => scoped.push(configured.clone()),
+        None => scoped.push(McpServer {
+            name: DEV_MCP.into(),
+            command: DEV_MCP.into(),
+            args: vec![],
+            env: vec![],
+        }),
+    }
+    scoped
 }
 
 fn mcp_servers_with_git_origin(
