@@ -1,0 +1,18 @@
+[package]
+name = "buzz-voice-mcp"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "MCP Server bridging Goose to Buzz local ONNX voice"
+
+[dependencies]
+buzz-voice = { path = "../buzz-voice" }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+tokio = { workspace = true, features = ["full"] }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+rodio = "0.19"

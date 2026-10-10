@@ -227,6 +227,7 @@ fn builtin_ids() -> impl Iterator<Item = &'static str> {
         "buzz-agent",
         "muse",
         "muse-code",
+        "antigravity",
     ];
     let tier2 = crate::managed_agents::discovery::preset_harness_ids();
     TIER1.iter().copied().chain(tier2.iter().copied())
@@ -551,6 +552,7 @@ mod tests {
             "buzz-agent",
             "muse",
             "muse-code",
+            "antigravity",
         ] {
             assert!(check_id_collision(id).is_err(), "{id} should be rejected");
         }

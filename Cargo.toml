@@ -28,7 +28,7 @@ members = [
     "crates/buzz-dev-mcp",
     "crates/buzz-voice",
     "crates/buzz-backend-kubernetes",
-    "examples/countdown-bot",
+    "examples/countdown-bot", "crates/buzz-voice-mcp",
 ]
 exclude = ["desktop/src-tauri"]
 resolver = "2"
